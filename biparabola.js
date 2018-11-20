@@ -67,7 +67,7 @@ function solve_bisect(f, xmin = 0, xmax = 1) {
 	let smax = Math.sign(f(xmax));
 	if (smax == 0) { return xmax; }
 	if (smin == smax) {
-		console.log("solve_bisect: doesn't straddle solution");
+		//console.log("solve_bisect: doesn't straddle solution");
 		return;
 	}
 	var x;
@@ -110,7 +110,7 @@ class Ui {
 		this.l_th = 0.7;
 		this.l_a = 2.0;
 		this.r_th = 0.9;
-		this.r_a = 2.0;
+		this.r_a = 1.0;
 
 		// Layout values.
 		this.x0 = 100;
@@ -161,6 +161,7 @@ class Ui {
 	}
 
 	redraw() {
+		this.calc_best()
 		let l_para = new Parabola(this.l_th, this.l_a);
 		let left_par_data = l_para.path_data(this.x0, this.y0, this.chord, this.chord);
 		document.getElementById("left_par").setAttribute("d", left_par_data);
@@ -176,6 +177,7 @@ class Ui {
 			plots.removeChild(plots.firstChild);
 		}
 
+		/*
 		for (var i = 0; i <= 10; i++) {
 			let x = i / 10.0;
 			let t = l_para.solve_t_given_x(x, 1);
@@ -186,6 +188,52 @@ class Ui {
 			let k = l_para.compute_k_given_t(t);
 			plot(this.x0 + x * this.chord, this.y0 + 150 - k * 50);
 		}
+		*/
+
+	}
+
+	calc_err(l_para, r_para) {
+		let x = solve_bisect(x => {
+			let t0 = l_para.solve_t_given_x(x, 1);
+			let k0 = l_para.compute_k_given_t(t0);
+			let t1 = r_para.solve_t_given_x(1 - x, 1);
+			let k1 = r_para.compute_k_given_t(t1);
+			//console.log(`x=${x}, t0=${t0}, k0=${k0}, t1=${t1}, k1=${k1}`);
+			return k0 - k1;
+		});
+		let t0 = l_para.solve_t_given_x(x, 1);
+		let y0 = l_para.compute_y_given_t(t0);
+		let t1 = r_para.solve_t_given_x(1 - x, 1);
+		let y1 = r_para.compute_y_given_t(t1);
+		let dy = y1 - y0;
+		//plot(this.x0 + x * this.chord, this.y0 - y0 * this.chord);
+		//plot(this.x0 + x * this.chord, this.y0 - y1 * this.chord);
+		let th0 = l_para.compute_th_given_t(t0);
+		let th1 = r_para.compute_th_given_t(t1);
+		return {"y_err": dy, "th_err": th0 + th1};
+	}
+
+	calc_best() {
+		var e_best = 1e12;
+		var l_a_best = 0;
+		var r_a_best = 0;
+		for (var i = 0; i < 100; i++) {
+			let l_a = i * 0.1;
+			let l_para = new Parabola(this.l_th, l_a);
+			for (var j = 0; j < 100; j++) {
+				let r_a = j * 0.1;
+				let r_para = new Parabola(this.r_th, r_a);
+				let err = this.calc_err(l_para, r_para);
+				let enorm = Math.pow(err.y_err, 2) + Math.pow(err.th_err, 2);
+				if (enorm < e_best) {
+					e_best = enorm;
+					l_a_best = l_a;
+					r_a_best = r_a;
+				}
+			}
+		}
+		this.l_a = l_a_best;
+		this.r_a = r_a_best;
 	}
 
 	set_th_handle(id, xscale, th) {
