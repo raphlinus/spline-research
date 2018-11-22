@@ -9,7 +9,7 @@ class Parabola {
 	path_data(x0, y0, xscale, yscale) {
 		let sth = Math.sin(this.th);
 		let cth = Math.cos(this.th);
-		let v = 1;
+		let v = Math.sign(this.a);
 		let u = Math.sqrt(v / this.a);
 		let x1 = x0 + xscale * (u * cth + v * sth);
 		let y1 = y0 + yscale * (v * cth - u * sth);
@@ -156,10 +156,11 @@ function solve_bisect(f, xmin = 0, xmax = 1) {
 function solve2d(f, u_init, v_init) {
 	var u = u_init;
 	var v = v_init;
-	let epsilon = 1e-6;
-	for (var i = 0; i < 10; i++) {
+	let epsilon = 1e-8;
+	for (var i = 0; i < 400; i++) {
 		//console.log(u, v);
 		let a = f(u, v);
+		if (i == 399) { console.log(a); }
 		//console.log(`a=(${a.x}, ${a.y})`);
 		let a_du = f(u + epsilon, v);
 		let dxdu = (a_du.x - a.x) / epsilon;
@@ -169,10 +170,39 @@ function solve2d(f, u_init, v_init) {
 		let dydv = (a_dv.y - a.y) / epsilon;
 		//console.log(`dxdu=${dxdu}, dydu=${dydu}, dxdv=${dxdv}, dydv=${dydv}`);
 		let determ = dxdu * dydv - dydu * dxdv;
-		u += (a.x * dxdu - a.y * dydu) / determ;
-		v += (a.y * dydv - a.x * dxdv) / determ;
+		let factor = 0.05;
+		u -= factor * (a.x * dydv - a.y * dydu) / determ;
+		v -= factor * (a.y * dxdu - a.x * dxdv) / determ;
 	}
 	return {u: u, v: v};
+}
+
+function solve2d_brute(f, umin, umax, vmin, vmax) {
+	return {u: 0.5, v: 0};
+	let n = 100;
+	let e_best = 1e12;
+	let u_best = null;
+	let v_best = null;
+	for (var i = 0; i <= n; i++) {
+		u = umin + i / n * (umax - umin);
+		for (var j = 0; j <= n; j++) {
+			v = vmin + j / n * (vmax - vmin);
+			let xy = f(u, v);
+			let norm2 = xy.x * xy.x + xy.y * xy.y;
+			if (norm2 < e_best) {
+				e_best = norm2;
+				u_best = u;
+				v_best = v;
+			}
+		}
+	}
+	return {u: u_best, v: v_best};
+}
+
+function solve2d_hybrid(f, umin, umax, vmin, vmax) {
+	let uv = solve2d_brute(f, umin, umax, vmin, vmax);
+	plot(100 + 200 * uv.u, 200 - 200 * uv.v);
+	return solve2d(f, uv.u, uv.v);
 }
 
 function make_two_quads(d0, d1, a0, a1, b) {
@@ -211,6 +241,47 @@ function solve_quads(th0, th1) {
 	document.getElementById("left_qb").setAttribute("d", quads.q0.path_data(100, 200, 200));
 	document.getElementById("right_qb").setAttribute("d", quads.q1.path_data(100, 200, 200));
 	console.log(uv, b);
+}
+
+// Another attempt at solving, using the join point as the 2d parameter space
+
+// Calculate the curvature at the join point
+function calc_para_k(th, x, y) {
+	// reparameterize, parabola is v = a u^2
+	let u = Math.cos(th) * x + Math.sin(th) * y;
+	let v = Math.cos(th) * y - Math.sin(th) * x;
+	return 2 * u * v * Math.pow(u * u + 4 * v * v, -1.5);
+}
+
+function calc_para_v(th, x, y) {
+	let dot = Math.cos(th) * y - Math.sin(th) * x;
+	let res_x = x - Math.sin(th) * dot;
+	let res_y = y + Math.cos(th) * dot;
+	return new Vec2(res_x, res_y);
+}
+
+// Calculate curvature at the vertex
+function calc_para_a(th, x, y) {
+	let u = Math.cos(th) * x + Math.sin(th) * y;
+	let v = Math.cos(th) * y - Math.sin(th) * x;
+	return -v / (u * u);
+}
+
+function solve_join(th0, th1) {
+	let xy = solve2d((x, y) => {
+		let k0 = calc_para_k(th0, x, y);
+		let k1 = calc_para_k(th1, 1 - x, y);
+		let v0 = calc_para_v(th0, x, y);
+		let v1 = calc_para_v(th1, 1 - x, y);
+		//console.log(x, y, k0, k1, v0, v1);
+		let vcross = v0.x * v1.y + v0.y * v1.x;
+		return new Vec2(Math.abs(k0) - Math.abs(k1), 10 * vcross);
+	}, 0.5, 0);
+	let a0 = calc_para_a(th0, xy.u, xy.v);
+	let a1 = calc_para_a(th1, 1 - xy.u, xy.v);
+	plot(100 + 200 * xy.u, 200 - 200 * xy.v);
+	console.log(xy, a0, a1);
+	return {a0: a0, a1: a1};
 }
 
 let th = 0.1;
@@ -290,7 +361,14 @@ class Ui {
 	}
 
 	redraw() {
-		solve_quads(this.l_th, this.r_th);
+		let plots = document.getElementById("plots");
+		while (plots.firstChild) {
+			plots.removeChild(plots.firstChild);
+		}
+
+		let vertex_ks = solve_join(this.l_th, this.r_th);
+		this.l_a = vertex_ks.a0;
+		this.r_a = vertex_ks.a1;
 		//this.calc_best();
 		let l_para = new Parabola(this.l_th, this.l_a);
 		let left_par_data = l_para.path_data(this.x0, this.y0, this.chord, this.chord);
@@ -301,11 +379,6 @@ class Ui {
 		let right_par_data = r_para.path_data(this.x0 + this.chord, this.y0, -this.chord, this.chord);
 		document.getElementById("right_par").setAttribute("d", right_par_data);
 		this.set_th_handle("right_th", -1, this.r_th);
-
-		let plots = document.getElementById("plots");
-		while (plots.firstChild) {
-			plots.removeChild(plots.firstChild);
-		}
 
 		/*
 		for (var i = 0; i <= 10; i++) {
@@ -340,7 +413,7 @@ class Ui {
 		//plot(this.x0 + x * this.chord, this.y0 - y1 * this.chord);
 		let th0 = l_para.compute_th_given_t(t0);
 		let th1 = r_para.compute_th_given_t(t1);
-		return {y_err: dy, th_err: th0 + th1};
+		return {y_err: dy, th_err: Math.sin(th0 + th1)};
 	}
 
 	calc_best() {
