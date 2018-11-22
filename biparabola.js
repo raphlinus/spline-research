@@ -39,6 +39,72 @@ class Parabola {
 	}
 }
 
+class Vec2 {
+	constructor(x, y) {
+		this.x = x;
+		this.y = y;
+	}
+
+	norm() {
+		return Math.hypot(this.x, this.y);
+	}
+
+	dot(other) {
+		return this.x * other.x + this.y * other.y;
+	}
+
+	cross(other) {
+		return this.x * other.y - this.y * other.x;
+	}
+}
+
+class QuadBez {
+	constructor(x0, y0, x1, y1, x2, y2) {
+		this.x0 = x0;
+		this.y0 = y0;
+		this.x1 = x1;
+		this.y1 = y1;
+		this.x2 = x2;
+		this.y2 = y2;
+	}
+
+	eval(t) {
+		let mt = 1 - t;
+		let x = mt * mt * this.x0 + 2 * t * mt * this.x1 + t * t * this.x2;
+		let y = mt * mt * this.y0 + 2 * t * mt * this.y1 + t * t * this.y2;
+		return new Vec2(x, y);
+	}
+
+	deriv(t) {
+		let x = (1 - t) * (this.x1 - this.x0) + t * (this.x2 - this.x1);
+		let y = (1 - t) * (this.y1 - this.y0) + t * (this.y2 - this.y1);
+		return new Vec2(x, y);
+	}
+
+	// could be hoisted to constructor
+	deriv2() {
+		let x = this.x0 - 2 * this.x1 + this.x2;
+		let y = this.y0 - 2 * this.y1 + this.y2;
+		return new Vec2(x, y);
+	}
+
+	curvature(t) {
+		let d = this.deriv(t);
+		let d2 = this.deriv2();
+		return d.cross(d2) / Math.pow(d.norm(), 3);
+	}
+
+	path_data(x0, y0, scale) {
+		let x1 = x0 + scale * this.x0;
+		let y1 = y0 - scale * this.y0;
+		let x2 = x0 + scale * this.x1;
+		let y2 = y0 - scale * this.y1;
+		let x3 = x0 + scale * this.x2;
+		let y3 = y0 - scale * this.y2;
+		return `M${x1} ${y1} Q${x2} ${y2} ${x3} ${y3}`;
+	}
+}
+
 function plot(x, y, color = "black", r = 2) {
 	let circle = document.createElementNS(svgNS, "circle");
 	circle.setAttribute("cx", x);
@@ -61,6 +127,8 @@ function tangent_marker(x, y, th) {
 	document.getElementById("plots").appendChild(line);
 }
 
+// Solve a 1d function using the bisection method.
+// Not super fast but very stable.
 function solve_bisect(f, xmin = 0, xmax = 1) {
 	let smin = Math.sign(f(xmin));
 	if (smin == 0) { return xmin; }
@@ -71,7 +139,7 @@ function solve_bisect(f, xmin = 0, xmax = 1) {
 		return;
 	}
 	var x;
-	for (var i = 0; i < 20; i++) {
+	for (var i = 0; i < 30; i++) {
 		x = 0.5 * (xmin + xmax);
 		let s = Math.sign(f(x));
 		if (s == 0) { return x; }
@@ -82,6 +150,67 @@ function solve_bisect(f, xmin = 0, xmax = 1) {
 		}
 	}
 	return x;
+}
+
+// Solve a function returning a 2-vector using Newton method.
+function solve2d(f, u_init, v_init) {
+	var u = u_init;
+	var v = v_init;
+	let epsilon = 1e-6;
+	for (var i = 0; i < 10; i++) {
+		//console.log(u, v);
+		let a = f(u, v);
+		//console.log(`a=(${a.x}, ${a.y})`);
+		let a_du = f(u + epsilon, v);
+		let dxdu = (a_du.x - a.x) / epsilon;
+		let dydu = (a_du.y - a.y) / epsilon;
+		let a_dv = f(u, v + epsilon);
+		let dxdv = (a_dv.x - a.x) / epsilon;
+		let dydv = (a_dv.y - a.y) / epsilon;
+		//console.log(`dxdu=${dxdu}, dydu=${dydu}, dxdv=${dxdv}, dydv=${dydv}`);
+		let determ = dxdu * dydv - dydu * dxdv;
+		u += (a.x * dxdu - a.y * dydu) / determ;
+		v += (a.y * dydv - a.x * dxdv) / determ;
+	}
+	return {u: u, v: v};
+}
+
+function make_two_quads(d0, d1, a0, a1, b) {
+	let x1 = a0 * d0.x;
+	let y1 = a0 * d0.y;
+	let x3 = 1 + a1 * d1.x;
+	let y3 = a1 * d1.y;
+	let x2 = x1 + b * (x3 - x1);
+	let y2 = y1 + b * (y3 - y1);
+	let q0 = new QuadBez(0, 0, x1, y1, x2, y2);
+	let q1 = new QuadBez(x2, y2, x3, y3, 1, 0);
+	return {q0: q0, q1: q1};
+}
+
+function solve_quads_for_b(d0, d1, a0, a1) {
+	return solve_bisect(b => {
+		let quads = make_two_quads(d0, d1, a0, a1, b);
+		let kl = quads.q0.curvature(1);
+		let kr = quads.q1.curvature(0);
+		return Math.abs(kl) - Math.abs(kr);
+	}, 0.001, 0.999);
+}
+
+function solve_quads(th0, th1) {
+	let d0 = new Vec2(Math.cos(th0), Math.sin(th0));
+	let d1 = new Vec2(-Math.cos(th1), Math.sin(th1));
+	let uv = solve2d((u, v) => {
+		let b = solve_quads_for_b(d0, d1, u, v);
+		let quads = make_two_quads(d0, d1, u, v, b);
+		let dot0 = quads.q0.deriv(0).dot(quads.q0.deriv2());
+		let dot1 = quads.q1.deriv(1).dot(quads.q1.deriv2());
+		return new Vec2(dot0, dot1);
+	}, 0.2, 0.2);
+	let b = solve_quads_for_b(d0, d1, uv.u, uv.v);
+	let quads = make_two_quads(d0, d1, uv.u, uv.v, b);
+	document.getElementById("left_qb").setAttribute("d", quads.q0.path_data(100, 200, 200));
+	document.getElementById("right_qb").setAttribute("d", quads.q1.path_data(100, 200, 200));
+	console.log(uv, b);
 }
 
 let th = 0.1;
@@ -161,7 +290,8 @@ class Ui {
 	}
 
 	redraw() {
-		this.calc_best()
+		solve_quads(this.l_th, this.r_th);
+		//this.calc_best();
 		let l_para = new Parabola(this.l_th, this.l_a);
 		let left_par_data = l_para.path_data(this.x0, this.y0, this.chord, this.chord);
 		document.getElementById("left_par").setAttribute("d", left_par_data);
@@ -210,7 +340,7 @@ class Ui {
 		//plot(this.x0 + x * this.chord, this.y0 - y1 * this.chord);
 		let th0 = l_para.compute_th_given_t(t0);
 		let th1 = r_para.compute_th_given_t(t1);
-		return {"y_err": dy, "th_err": th0 + th1};
+		return {y_err: dy, th_err: th0 + th1};
 	}
 
 	calc_best() {
