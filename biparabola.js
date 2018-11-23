@@ -157,10 +157,9 @@ function solve2d(f, u_init, v_init) {
 	var u = u_init;
 	var v = v_init;
 	let epsilon = 1e-8;
-	for (var i = 0; i < 400; i++) {
+	for (var i = 0; i < 200; i++) {
 		//console.log(u, v);
 		let a = f(u, v);
-		if (i == 399) { console.log(a); }
 		//console.log(`a=(${a.x}, ${a.y})`);
 		let a_du = f(u + epsilon, v);
 		let dxdu = (a_du.x - a.x) / epsilon;
@@ -170,7 +169,7 @@ function solve2d(f, u_init, v_init) {
 		let dydv = (a_dv.y - a.y) / epsilon;
 		//console.log(`dxdu=${dxdu}, dydu=${dydu}, dxdv=${dxdv}, dydv=${dydv}`);
 		let determ = dxdu * dydv - dydu * dxdv;
-		let factor = 0.05;
+		let factor = 0.1;
 		u -= factor * (a.x * dydv - a.y * dydu) / determ;
 		v -= factor * (a.y * dxdu - a.x * dxdv) / determ;
 	}
@@ -178,7 +177,6 @@ function solve2d(f, u_init, v_init) {
 }
 
 function solve2d_brute(f, umin, umax, vmin, vmax) {
-	return {u: 0.5, v: 0};
 	let n = 100;
 	let e_best = 1e12;
 	let u_best = null;
@@ -229,17 +227,18 @@ function solve_quads_for_b(d0, d1, a0, a1) {
 function solve_quads(th0, th1) {
 	let d0 = new Vec2(Math.cos(th0), Math.sin(th0));
 	let d1 = new Vec2(-Math.cos(th1), Math.sin(th1));
-	let uv = solve2d((u, v) => {
+	let uv = solve2d_hybrid((u, v) => {
 		let b = solve_quads_for_b(d0, d1, u, v);
 		let quads = make_two_quads(d0, d1, u, v, b);
 		let dot0 = quads.q0.deriv(0).dot(quads.q0.deriv2());
 		let dot1 = quads.q1.deriv(1).dot(quads.q1.deriv2());
 		return new Vec2(dot0, dot1);
-	}, 0.2, 0.2);
+	}, 0.01, 0.4, 0.01, 0.4);
 	let b = solve_quads_for_b(d0, d1, uv.u, uv.v);
+	console.log(`solve_quads soln ${uv.u} ${uv.v} ${b}`);
 	let quads = make_two_quads(d0, d1, uv.u, uv.v, b);
-	document.getElementById("left_qb").setAttribute("d", quads.q0.path_data(100, 200, 200));
-	document.getElementById("right_qb").setAttribute("d", quads.q1.path_data(100, 200, 200));
+	document.getElementById("left_qb").setAttribute("d", quads.q0.path_data(100, 300, 200));
+	document.getElementById("right_qb").setAttribute("d", quads.q1.path_data(100, 300, 200));
 	console.log(uv, b);
 }
 
@@ -282,6 +281,58 @@ function solve_join(th0, th1) {
 	plot(100 + 200 * xy.u, 200 - 200 * xy.v);
 	console.log(xy, a0, a1);
 	return {a0: a0, a1: a1};
+}
+
+function calc_y_for_x_join(th0, th1, x) {
+	return solve_bisect(y => {
+		let v0 = calc_para_v(th0, x, y);
+		let v1 = calc_para_v(th1, 1 - x, y);
+		let vcross = v0.x * v1.y + v0.y * v1.x;
+		return vcross;
+	}, -0.5, 0.5);
+}
+
+function solve_join2(th0, th1) {
+	let n = 1000;
+	var xbest = null;
+	var ybest = null;
+	var kebest = 1e12;
+	let x = solve_bisect(x => {
+		let y = calc_y_for_x_join(th0, th1, x);
+		let k0 = calc_para_k(th0, x, y);
+		let k1 = calc_para_k(th1, 1 - x, y);
+		return Math.abs(k0) - Math.abs(k1);
+	}, 1e-6, 1.0 - 1e-6);
+	let y = calc_y_for_x_join(th0, th1, x);
+	let a0 = calc_para_a(th0, x, y);
+	let a1 = calc_para_a(th1, 1 - x, y);
+	plot(100 + 200 * x, 200 - 200 * y);
+	return {a0: a0, a1: a1};
+}
+
+function visualize_err(th0, th1) {
+	for (var i = 0; i <= 10; i++) {
+		let x = i * .1;
+		for (var j = -5; j <= 5; j++) {
+			let y = j * .1;
+			let v0 = calc_para_v(th0, x, y);
+			let th = Math.atan2(v0.y, v0.x);
+			tangent_marker(100 + 200 * x, 200 - 200 * y, th);
+
+			let v1 = calc_para_v(th1, 1 - x, y);
+			let th2 = Math.atan2(v1.y, -v1.x);
+			tangent_marker(100 + 200 * x, 200 - 200 * y, th2);
+
+			let k0 = calc_para_k(th0, x, y);
+			let k1 = calc_para_k(th1, 1 - x, y);
+			let ke = Math.abs(k0) - Math.abs(k1);
+			if (!isNaN(ke)) {
+				let r = Math.max(0, Math.min(15, Math.round(7 + 8 * ke)));
+				let color = '#' + r.toString(16) + '77';
+				plot(100 + 200 * x, 200 - 200 * y, color);
+			}
+		}
+	}
 }
 
 let th = 0.1;
@@ -366,7 +417,11 @@ class Ui {
 			plots.removeChild(plots.firstChild);
 		}
 
-		let vertex_ks = solve_join(this.l_th, this.r_th);
+		// The quad solver also kinda works, and sometimes finds solutions that the join-based
+		// solver does not.
+		//solve_quads(this.l_th, this.r_th);
+		let vertex_ks = solve_join2(this.l_th, this.r_th);
+		visualize_err(this.l_th, this.r_th);
 		this.l_a = vertex_ks.a0;
 		this.r_a = vertex_ks.a1;
 		//this.calc_best();
