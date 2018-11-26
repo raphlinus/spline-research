@@ -12,7 +12,7 @@
 <body>
 	<svg id="s" width="640" height="480" pointer-events="all">
 		<!-- chord line -->
-		<line x1="100" y1="200" x2="300" y2="200" stroke="black" />
+		<line x1="100" y1="200" x2="300" y2="200" stroke="black" pointer-events="none" />
 		<g id="left_th" class="th_handle">
 			<line x1="100" y1="200" x2="135" y2="165" />
 			<circle cx="135" cy="165" r="3" />
@@ -21,10 +21,10 @@
 			<line x1="300" y1="200" x2="135" y2="165" />
 			<circle cx="135" cy="165" r="3" />
 		</g>
-		<path id="left_par" d="" stroke="blue" fill="none" />
-		<path id="right_par" d="" stroke="green" fill="none" />
-		<path id="left_qb" d="" stroke="blue" fill="none" />
-		<path id="right_qb" d="" stroke="green" fill="none" />
+		<path id="left_par" d="" stroke="blue" fill="none" pointer-events="none" />
+		<path id="right_par" d="" stroke="green" fill="none" pointer-events="none" />
+		<path id="left_qb" d="" stroke="blue" fill="none" pointer-events="none" />
+		<path id="right_qb" d="" stroke="green" fill="none" pointer-events="none" />
 		<g id="plots" />
 	</svg>
 </body>

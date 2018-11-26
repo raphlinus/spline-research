@@ -105,8 +105,14 @@ class QuadBez {
 	}
 }
 
+function createSvgElement(tagName) {
+	let element = document.createElementNS(svgNS, tagName);
+	element.setAttribute("pointer-events", "none");
+	return element;
+}
+
 function plot(x, y, color = "black", r = 2) {
-	let circle = document.createElementNS(svgNS, "circle");
+	let circle = createSvgElement("circle");
 	circle.setAttribute("cx", x);
 	circle.setAttribute("cy", y);
 	circle.setAttribute("r", r);
@@ -118,7 +124,7 @@ function tangent_marker(x, y, th) {
 	let len = 5;
 	let dx = len * Math.cos(th);
 	let dy = len * Math.sin(th);
-	let line = document.createElementNS(svgNS, "line");
+	let line = createSvgElement("line");
 	line.setAttribute("x1", x - dx);
 	line.setAttribute("y1", y + dy);
 	line.setAttribute("x2", x + dx);
