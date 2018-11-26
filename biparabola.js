@@ -293,10 +293,6 @@ function calc_y_for_x_join(th0, th1, x) {
 }
 
 function solve_join2(th0, th1) {
-	let n = 1000;
-	var xbest = null;
-	var ybest = null;
-	var kebest = 1e12;
 	let x = solve_bisect(x => {
 		let y = calc_y_for_x_join(th0, th1, x);
 		let k0 = calc_para_k(th0, x, y);
