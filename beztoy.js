@@ -58,17 +58,23 @@ class Ui {
 	}
 
 	redraw() {
+		let th0 = Math.atan2(this.coords[3], this.coords[2]);
+		let th1 = Math.atan2(this.coords[5], 1 - this.coords[4]);
+		//let coords = this.coords;
+		let coords = myCubic(th0, th1);
+
 		// Draw the bezier
 		var path = "";
 		for (var i = 0; i < 4; i ++) {
-			let x = 100 + 200 * this.coords[i * 2];
-			let y = 200 - 200 * this.coords[i * 2 + 1];
+			let x = 100 + 200 * coords[i * 2];
+			let y = 200 - 200 * coords[i * 2 + 1];
 			let cmd = ['M', ' C', ' ', ' '][i];
 			path += `${cmd}${x} ${y}`;
 		}
 		document.getElementById("bez").setAttribute("d", path);
 
-		let cb = new CubicBez(this.coords);
+		// Draw the graph of curvature vs arclength.
+		let cb = new CubicBez(coords);
 		path = "";
 		var cmd = "M";
 		var last = new Vec2(0, 0);

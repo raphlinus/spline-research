@@ -66,6 +66,12 @@ class CubicBez {
 		let d2 = this.deriv2(t);
 		return d.cross(d2) / Math.pow(d.norm(), 3);
 	}
+
+	atanCurvature(t) {
+		let d = this.deriv(t);
+		let d2 = this.deriv2(t);
+		return Math.atan2(d.cross(d2), Math.pow(d.norm(), 3));
+	}
 }
 
 function testCubicBez() {
@@ -136,3 +142,52 @@ function testTridiag(n) {
 
 //testTridiag(10);
 //testCubicBez();
+
+/// Create a smooth cubic bezier.
+function myCubic(th0, th1) {
+	function myCubicLen(th0, th1) {
+		let offset = 0.3 * Math.sin(th1 * 2 - 0.4 * Math.sin(th1 * 2));
+		let drive = 2.0;
+		let scale = 1.0 / (3 * Math.tanh(drive));
+		let len = scale * Math.tanh(drive * Math.cos(th0 - offset));
+		return len;
+	}
+
+	var coords = new Float64Array(8);
+	let len0 = myCubicLen(th0, th1);
+	coords[2] = Math.cos(th0) * len0;
+	coords[3] = Math.sin(th0) * len0;
+
+	let len1 = myCubicLen(th1, th0);
+	coords[4] = 1 - Math.cos(th1) * len1;
+	coords[5] = Math.sin(th1) * len1;
+	coords[6] = 1;
+	return coords;
+}
+
+/// Make a curvature map of a function that gives coords of a single bezier, suitable for gnuplot
+function makeCurvatureMap(f) {
+	let n = 200;
+	for (var j = 0; j < n; j++) {
+		let th1 = -Math.PI/2 + Math.PI * j / (n - 1);
+		for (var i = 0; i < n; i++) {
+			let th0 = -Math.PI/2 + Math.PI * i / (n - 1);
+			let cb = new CubicBez(f(th0, th1));
+			let atanK = cb.atanCurvature(0);
+			console.log(`${th0} ${th1} ${atanK}`);
+		}
+		console.log('');
+	}
+}
+
+function isNode() {
+	try {
+		return this === global;
+	} catch(e) {
+		return false;
+	}
+}
+
+if (isNode()) {
+	makeCurvatureMap(myCubic);
+}
