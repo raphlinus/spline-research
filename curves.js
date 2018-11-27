@@ -191,3 +191,94 @@ function isNode() {
 if (isNode()) {
 	makeCurvatureMap(myCubic);
 }
+
+//! Base class for two parameter curve families
+
+class TwoParamCurve {
+	/// Render the curve, providing an array of _interior_ cubic bezier
+	/// control points only. Return value is an array of 3n-1 Vec2's.
+	// render(th0, th1)
+}
+
+class MyCurve extends TwoParamCurve {
+	render(th0, th1) {
+		let c = myCubic(th0, th1);
+		return [new Vec2(c[2], c[3]), new Vec2(c[4], c[5])];
+	}
+}
+
+//! Global spline solver
+
+// normalize theta to -pi..pi
+function mod2pi(th) {
+	let twopi = 2 * Math.PI;
+	let frac = th * (1 / twopi);
+	return twopi * (frac - Math.round(frac)); 
+}
+
+
+class TwoParamSpline {
+	constructor(curve, ctrlPts) {
+		this.curve = curve;
+		this.ctrlPts = ctrlPts;
+	}
+
+	/// Determine initial tangent angles, given array of Vec2 control points.
+	initialThs() {
+		var ths = new Float64Array(this.ctrlPts.length);
+		for (var i = 1; i < ths.length - 1; i++) {
+			let dx0 = this.ctrlPts[i].x - this.ctrlPts[i - 1].x;
+			let dy0 = this.ctrlPts[i].y - this.ctrlPts[i - 1].y;
+			let l0 = Math.hypot(dx0, dy0);
+			let dx1 = this.ctrlPts[i + 1].x - this.ctrlPts[i].x;
+			let dy1 = this.ctrlPts[i + 1].y - this.ctrlPts[i].y;
+			let l1 = Math.hypot(dx1, dy1);
+			let th0 = Math.atan2(dy0, dx0);
+			let th1 = Math.atan2(dy1, dx1);
+			let bend = mod2pi(th1 - th0);
+			let th = mod2pi(th0 + bend * l0 / (l0 + l1));
+			ths[i] = th;
+			if (i == 1) { ths[0] = th0; }
+			if (i == ths.length - 2) { ths[i + 1] = th1; }
+		}
+		this.ths = ths;
+		return ths;
+	}
+
+	// combine with next func, return struct?
+	getTh0(i) {
+		let dx = this.ctrlPts[i + 1].x - this.ctrlPts[i].x;
+		let dy = this.ctrlPts[i + 1].y - this.ctrlPts[i].y;
+		return mod2pi(this.ths[i] - Math.atan2(dy, dx));
+	}
+
+	getTh1(i) {
+		let dx = this.ctrlPts[i + 1].x - this.ctrlPts[i].x;
+		let dy = this.ctrlPts[i + 1].y - this.ctrlPts[i].y;
+		return mod2pi(Math.atan2(dy, dx) - this.ths[i + 1]);
+	}
+
+	/// Return an SVG path string.
+	renderSvg() {
+		let c = this.ctrlPts;
+		if (c.length == 0) { return ""; }
+		var path = `M${c[0].x} ${c[0].y}`;
+		var cmd = " C";
+		for (var i = 0; i < c.length - 1; i++) {
+			let th0 = this.getTh0(i);
+			let th1 = this.getTh1(i);
+			let render = this.curve.render(th0, th1);
+			let dx = c[i + 1].x - c[i].x;
+			let dy = c[i + 1].y - c[i].y;
+			for (var j = 0; j < render.length; j++) {
+				let pt = render[j];
+				let x = c[i].x + dx * pt.x - dy * pt.y;
+				let y = c[i].y + dy * pt.x + dx * pt.y;
+				path += `${cmd}${x} ${y}`;
+				cmd = " ";
+			}
+			path += ` ${c[i + 1].x} ${c[i + 1].y}`;
+		}
+		return path;
+	}
+}
