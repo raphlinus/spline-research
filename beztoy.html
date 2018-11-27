@@ -1,0 +1,25 @@
+<!doctype html>
+<style>
+.th_handle {
+	stroke: #800;
+	fill: #800;
+}
+.th_handle:hover {
+	stroke: #f00;
+	fill: #f00;
+}
+</style>
+<body>
+	<svg id="s" width="640" height="480" pointer-events="all">
+		<!-- chord line -->
+		<line x1="100" y1="200" x2="300" y2="200" stroke="black" pointer-events="none" />
+		<circle id="left_th" class="th_handle" cx="100" cy="200" r="3" />
+		<circle id="right_th" class="th_handle" cx="300" cy="200" r="3" />
+		<path id="bez" d="" stroke="blue" fill="none" pointer-events="none" />
+		<path id="curv" d="" stroke="blue" fill="none" pointer-events="none" />
+		<line id="curv-base" x1="100" y1="300" x2="300" y2="300" stroke="black" pointer-events="none" />
+		<g id="plots" />
+	</svg>
+</body>
+<script src="curves.js"></script>
+<script src="beztoy.js"></script>
