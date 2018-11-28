@@ -1,8 +1,11 @@
 <!doctype html>
 <style>
 .handle {
-	fill: #800;
+	fill: none;
 	pointer-events: all;
+}
+svg:hover .handle {
+	fill: #800;
 }
 .handle:hover {
 	fill: #f00;
@@ -12,9 +15,11 @@
 	<svg id="s" width="640" height="480" pointer-events="all">
 		<path id="ctrlpoly" d="" stroke="none" fill="none" />
 		<path id="spline" d="" stroke="black" fill="none" stroke-width="2" />
+		<path id="spline2" d="" stroke="blue" fill="none" stroke-width="2" />
 		<g id="handles" />
 		<g id="plots" />
 	</svg>
 </body>
 <script src="curves.js"></script>
+<script src="biparabola.js"></script>
 <script src="splineui.js"></script>

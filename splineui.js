@@ -95,17 +95,45 @@ class Ui {
 			cmd = " L";
 		}
 		document.getElementById("ctrlpoly").setAttribute("d", path);
-		let spline = new TwoParamSpline(new MyCurve, this.controlPts);
-		let ths = spline.initialThs();
-		for (var i = 0; i < 10; i++) {
-			spline.iterDumb(i);
+
+		let showMyCurve = true;
+		let showBiParabola = true;
+		let spline2Offset = 200;
+		let nIter = 10;
+
+		if (showMyCurve) {
+			let spline = new TwoParamSpline(new MyCurve, this.controlPts);
+			let ths = spline.initialThs();
+			for (var i = 0; i < nIter; i++) {
+				spline.iterDumb(i);
+			}
+			let splinePath = spline.renderSvg();
+			document.getElementById("spline").setAttribute("d", splinePath);
 		}
-		let splinePath = spline.renderSvg();
-		document.getElementById("spline").setAttribute("d", splinePath);
+
+		if (showBiParabola) {
+			var pts = [];
+			for (var pt of this.controlPts) {
+				pts.push(new Vec2(pt.x + spline2Offset, pt.y));
+			}
+			let spline2 = new TwoParamSpline(new BiParabola, pts);
+			spline2.initialThs();
+			for (var i = 0; i < nIter; i++) {
+				let absErr = spline2.iterDumb(i);
+				if (i == nIter - 1) {
+					console.log(`biparabola err: ${absErr}`);
+				}
+			}
+			let spline2Path = spline2.renderSvg();
+			document.getElementById("spline2").setAttribute("d", spline2Path);
+		}
+
+		/*
 		for (var i = 0; i < ths.length; i++) {
 			let pt = this.controlPts[i]
 			this.tangentMarker(pt.x, pt.y, -ths[i]);
 		}
+		*/
 	}
 
 	// TODO: extend so it can insert at an arbitrary location

@@ -39,25 +39,6 @@ class Parabola {
 	}
 }
 
-class Vec2 {
-	constructor(x, y) {
-		this.x = x;
-		this.y = y;
-	}
-
-	norm() {
-		return Math.hypot(this.x, this.y);
-	}
-
-	dot(other) {
-		return this.x * other.x + this.y * other.y;
-	}
-
-	cross(other) {
-		return this.x * other.y - this.y * other.x;
-	}
-}
-
 class QuadBez {
 	constructor(x0, y0, x1, y1, x2, y2) {
 		this.x0 = x0;
@@ -308,8 +289,7 @@ function solve_join2(th0, th1) {
 	let y = calc_y_for_x_join(th0, th1, x);
 	let a0 = calc_para_a(th0, x, y);
 	let a1 = calc_para_a(th1, 1 - x, y);
-	plot(100 + 200 * x, 200 - 200 * y);
-	return {a0: a0, a1: a1};
+	return {a0: a0, a1: a1, x: x, y: y};
 }
 
 function visualize_err(th0, th1) {
@@ -337,27 +317,8 @@ function visualize_err(th0, th1) {
 	}
 }
 
-let th = 0.1;
-let a = 2.0;
-let para = new Parabola(th, a);
-let left_par_data = para.path_data(100, 200, 200, 200);
-document.getElementById("left_par").setAttribute("d", left_par_data);
-
-let rpara = new Parabola(0.9, 2.0);
-let right_par_data = rpara.path_data(300, 200, -200, 200);
-document.getElementById("right_par").setAttribute("d", right_par_data);
-
-let x_equalk = solve_bisect(x => {
-	let t0 = para.solve_t_given_x(x, 1);
-	let k0 = para.compute_k_given_t(t0);
-	let t1 = rpara.solve_t_given_x(1 - x, 1);
-	let k1 = para.compute_k_given_t(t1);
-	//console.log(`x=${x}, t0=${t0}, k0=${k0}, t1=${t1}, k1=${k1}`);
-	return k0 - k1;
-});
-console.log(x_equalk);
-
-class Ui {
+/// A UI, for use in biparabola.html.
+class BiParabolaUi {
 	constructor() {
 		// Initial values of UI-controller parameters.
 		this.l_th = 0.7;
@@ -423,6 +384,8 @@ class Ui {
 		// solver does not.
 		//solve_quads(this.l_th, this.r_th);
 		let vertex_ks = solve_join2(this.l_th, this.r_th);
+		plot(100 + 200 * vertex_ks.x, 200 - 200 * vertex_ks.y);
+
 		visualize_err(this.l_th, this.r_th);
 		this.l_a = vertex_ks.a0;
 		this.r_a = vertex_ks.a1;
@@ -510,5 +473,40 @@ class Ui {
 	}
 }
 
-let ui = new Ui();
-ui.redraw();
+class BiParabola extends TwoParamCurve {
+	render(th0, th1) {
+		function project(th, x, y, a, b, flip) {
+			let u = a * (Math.cos(th) * x + Math.sin(th) * y);
+			let v = b * (Math.cos(th) * y - Math.sin(th) * x);
+			var new_x = Math.cos(th) * u - Math.sin(th) * v;
+			let new_y = Math.cos(th) * v + Math.sin(th) * u;
+			if (flip) { new_x = 1 - new_x; }
+			return new Vec2(new_x, new_y);
+		}
+		let soln = solve_join2(th0, th1);
+		let x = soln.x;
+		let y = soln.y;
+		let result = [
+			project(th0, x, y, 1./3, 0, false),
+			project(th0, x, y, 2./3, 1./3, false),
+			new Vec2(x, y),
+			project(th1, 1 - x, y, 2./3, 1./3, true),
+			project(th1, 1 - x, y, 1./3, 0, true)
+		];
+		return result;
+	}
+
+	computeCurvature(th0, th1) {
+		let soln = solve_join2(th0, th1);
+		let u0 = Math.cos(th0) * soln.x + Math.sin(th0) * soln.y;
+		let u1 = Math.cos(th1) * (1 - soln.x) + Math.sin(th1) * soln.y;
+		let ak0 = Math.atan2(soln.a0, Math.sign(u0));
+		let ak1 = Math.atan2(soln.a1, Math.sign(u1));
+		return {ak0: ak0, ak1: ak1};
+	}
+
+	// Note: this isn't right
+	endpointTangent(th) {
+		return Math.atan(2 * Math.tan(th)) - th;
+	}
+}

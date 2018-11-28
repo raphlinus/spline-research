@@ -231,6 +231,9 @@ class MyCurve extends TwoParamCurve {
 	}
 
 	endpointTangent(th) {
+		// Same value as parabola:
+		//return Math.atan(2 * Math.tan(th)) - th;
+
 		return 0.5 * Math.sin(2 * th);
 	}
 }
@@ -300,7 +303,15 @@ class TwoParamSpline {
 		}
 
 		let n = this.ctrlPts.length;
-		if (n < 3) return;
+		if (n < 3) return 0;
+		// Fix endpoint tangents; we rely on iteration for this to converge
+		ths0 = this.getThs(0);
+		this.ths[0] += this.curve.endpointTangent(ths0.th1) - ths0.th0;
+
+		ths0 = this.getThs(n - 2);
+		this.ths[n - 1] -= this.curve.endpointTangent(ths0.th0) - ths0.th1;
+
+		var absErr = 0;
 		var x = new Float64Array(n - 2);
 		var ths0 = this.getThs(0);
 		var ak0 = this.curve.computeCurvature(ths0.th0, ths0.th1);
@@ -309,6 +320,7 @@ class TwoParamSpline {
 			let ths1 = this.getThs(i + 1);
 			let ak1 = this.curve.computeCurvature(ths1.th0, ths1.th1);
 			let err = computeErr(ths0, ak0, ths1, ak1);
+			absErr += Math.abs(err);
 
 			let epsilon = 1e-3;
 			let ak0p = this.curve.computeCurvature(ths0.th0, ths0.th1 + epsilon);
@@ -327,12 +339,7 @@ class TwoParamSpline {
 			this.ths[i + 1] += scale * x[i];
 		}
 
-		// Fix endpoint tangents; we rely on iteration for this to converge
-		ths0 = this.getThs(0);
-		this.ths[0] += this.curve.endpointTangent(ths0.th1) - ths0.th0;
-
-		ths0 = this.getThs(n - 2);
-		this.ths[n - 1] -= this.curve.endpointTangent(ths0.th0) - ths0.th1;
+		return absErr;
 	}
 
 	/// Perform one step of a Newton solver.
