@@ -278,8 +278,16 @@ class TwoParamSpline {
 	/// Crawl towards a curvature continuous solution.
 	iterDumb(iter) {
 		function computeErr(ths0, ak0, ths1, ak1) {
+			// rescale tangents by geometric mean of chordlengths
+			let ch0 = Math.sqrt(ths0.chord);
+			let ch1 = Math.sqrt(ths1.chord);
+			let a0 = Math.atan2(Math.sin(ak0.ak1) * ch1, Math.cos(ak0.ak1) * ch0);
+			let a1 = Math.atan2(Math.sin(ak1.ak0) * ch0, Math.cos(ak1.ak0) * ch1);
+			return a0 - a1;
+			/*
 			return ths1.chord * Math.sin(ak0.ak1) * Math.cos(ak1.ak0)
 				- ths0.chord * Math.sin(ak1.ak0) * Math.cos(ak0.ak1);
+			*/
 		}
 
 		let n = this.ctrlPts.length;
@@ -287,17 +295,18 @@ class TwoParamSpline {
 		var x = new Float64Array(n - 2);
 		var ths0 = this.getThs(0);
 		var ak0 = this.curve.computeCurvature(ths0.th0, ths0.th1);
+		//console.log('');
 		for (var i = 0; i < n - 2; i++) {
 			let ths1 = this.getThs(i + 1);
 			let ak1 = this.curve.computeCurvature(ths1.th0, ths1.th1);
 			let err = computeErr(ths0, ak0, ths1, ak1);
 
-			let epsilon = 1e-6;
+			let epsilon = 1e-3;
 			let ak0p = this.curve.computeCurvature(ths0.th0, ths0.th1 + epsilon);
 			let ak1p = this.curve.computeCurvature(ths1.th0 - epsilon, ths1.th1);
 			let errp = computeErr(ths0, ak0p, ths1, ak1p);
 			let derr = (errp - err) * (1 / epsilon);
-			//console.log(err, derr);
+			//console.log(err, derr, ak0, ak1, ak0p, ak1p);
 			x[i] = err / derr;
 
 			ths0 = ths1;
@@ -305,7 +314,7 @@ class TwoParamSpline {
 		}
 
 		for (var i = 0; i < n - 2; i++) {
-			let scale = Math.tanh((iter + 1) * 0.001);
+			let scale = 0.5;
 			this.ths[i + 1] += scale * x[i];
 		}
 	}

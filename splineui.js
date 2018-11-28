@@ -97,7 +97,7 @@ class Ui {
 		document.getElementById("ctrlpoly").setAttribute("d", path);
 		let spline = new TwoParamSpline(new MyCurve, this.controlPts);
 		let ths = spline.initialThs();
-		for (var i = 0; i < 100; i++) {
+		for (var i = 0; i < 20; i++) {
 			spline.iterDumb(i);
 		}
 		let splinePath = spline.renderSvg();
