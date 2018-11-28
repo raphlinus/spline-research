@@ -179,6 +179,11 @@ class TwoParamCurve {
 	/// of direction.
 	// computeCurvature(th0, th1)
 
+	/// Get endpoint condition.
+	///
+	/// Return tangent at endpoint given next-to-endpoint tangent.
+	// endpointTangent(th)
+
 	/// Compute curvature derivatives.
 	///
 	/// Result is an object with dak0dth0 and friends.
@@ -223,6 +228,10 @@ class MyCurve extends TwoParamCurve {
 		let ak1 = curv(1, -th1);
 
 		return {ak0: ak0, ak1: ak1};
+	}
+
+	endpointTangent(th) {
+		return 0.5 * Math.sin(2 * th);
 	}
 }
 
@@ -314,9 +323,16 @@ class TwoParamSpline {
 		}
 
 		for (var i = 0; i < n - 2; i++) {
-			let scale = 0.5;
+			let scale = Math.tanh(0.25 * (iter + 1));
 			this.ths[i + 1] += scale * x[i];
 		}
+
+		// Fix endpoint tangents; we rely on iteration for this to converge
+		ths0 = this.getThs(0);
+		this.ths[0] += this.curve.endpointTangent(ths0.th1) - ths0.th0;
+
+		ths0 = this.getThs(n - 2);
+		this.ths[n - 1] -= this.curve.endpointTangent(ths0.th0) - ths0.th1;
 	}
 
 	/// Perform one step of a Newton solver.
