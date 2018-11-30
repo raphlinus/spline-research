@@ -147,10 +147,17 @@ function testTridiag(n) {
 function myCubic(th0, th1) {
 	function myCubicLen(th0, th1) {
 		let offset = 0.3 * Math.sin(th1 * 2 - 0.4 * Math.sin(th1 * 2));
-		let drive = 2.0;
-		let scale = 1.0 / (3 * Math.tanh(drive));
-		let len = scale * Math.tanh(drive * Math.cos(th0 - offset));
-		return len;
+		let newShape = true;
+		if (newShape) {
+			let scale = 1.0 / (3 * 0.8);
+			let len = scale * (Math.cos(th0 - offset) - 0.2 * Math.cos((3 * (th0 - offset))));
+			return len;
+		} else {
+			let drive = 2.0;
+			let scale = 1.0 / (3 * Math.tanh(drive));
+			let len = scale * Math.tanh(drive * Math.cos(th0 - offset));
+			return len;
+		}
 	}
 
 	var coords = new Float64Array(8);
