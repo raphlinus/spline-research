@@ -413,29 +413,3 @@ class TwoParamSpline {
 		return path;
 	}
 }
-
-/// Make a curvature map of a two param curve, suitable for gnuplot
-function makeCurvatureMap(curve) {
-	let n = 200;
-	for (var j = 0; j < n; j++) {
-		let th1 = -Math.PI/2 + Math.PI * j / (n - 1);
-		for (var i = 0; i < n; i++) {
-			let th0 = -Math.PI/2 + Math.PI * i / (n - 1);
-			let atanK = curve.computeCurvature(th0, th1).ak0;
-			console.log(`${th0} ${th1} ${atanK}`);
-		}
-		console.log('');
-	}
-}
-
-function isNode() {
-	try {
-		return this === global;
-	} catch(e) {
-		return false;
-	}
-}
-
-if (isNode()) {
-	makeCurvatureMap(new MyCurve);
-}
