@@ -2,21 +2,154 @@
 
 //! UI for drawing splines
 
+/// Fancy name for something that just detects double clicks, but might expand.
+class GestureDet {
+	constructor() {
+		this.lastEv = null;
+		this.clickCount = 0;
+	}
+
+	onPointerDown(ev) {
+		let dblClickThreshold = 550; // ms
+		let radiusThreshold = 5;
+		if (this.lastEv !== null) {
+			if (ev.timeStamp - this.lastEv.timeStamp > dblClickThreshold
+				|| Math.hypot(ev.offsetX - this.lastEv.offsetX,
+					ev.offsetY - this.lastEv.offsetY) > radiusThreshold) {
+				this.clickCount = 0;
+			}
+		}
+		this.lastEv = ev;
+		this.clickCount++;
+	}
+}
+
+/// State and UI for an editable spline
+class SplineEdit {
+	constructor(ui) {
+		this.ui = ui;
+		this.knots = [];
+		this.selection = new Set();
+	}
+
+	setSelection(sel) {
+		for (let obj of this.selection) {
+			if (!sel.has(obj)) {
+				obj.handleEl.classList.remove("selected");
+			}
+		}
+		for (let obj of sel) {
+			if (!this.selection.has(obj)) {
+				obj.handleEl.classList.add("selected");
+			}
+		}
+		this.selection = sel;
+	}
+
+	onPointerDown(ev, obj) {
+		if (obj == null) {
+			let knot = new Knot(this, ev.offsetX, ev.offsetY, "smooth");
+			this.knots.push(knot);
+			this.ui.attachReceiver(knot.handleEl, this, knot);
+			// TODO: setter rather than state change?
+			this.ui.receiver = this;
+			this.setSelection(new Set([knot]));
+		} else {
+			if (this.ui.gestureDet.clickCount > 1) {
+				obj.toggleTy();
+			}
+			var sel = new Set([obj]);
+			if (ev.shiftKey || this.selection.has(obj)) {
+				for (let a of this.selection) {
+					sel.add(a);
+				}
+			}
+			this.setSelection(sel);
+			for (let knot of sel) {
+				knot.mode = "dragging";
+			}
+		}
+		this.lastPt = new Vec2(ev.offsetX, ev.offsetY);
+	}
+
+	onPointerMove(ev) {
+		let pt = new Vec2(ev.offsetX, ev.offsetY);
+		let dx = pt.x - this.lastPt.x;
+		let dy = pt.y - this.lastPt.y;
+		for (let knot of this.selection) {
+			if (knot.mode === "dragging") {
+				knot.updatePos(knot.x + dx, knot.y + dy);
+			}
+		}
+		this.lastPt = pt;
+	}
+}
+
+class Knot {
+	/// ty is one of 'corner', 'smooth'.
+	constructor(se, x, y, ty) {
+		this.se = se;
+		this.x = x;
+		this.y = y;
+		this.ty = ty;
+
+		this.mode = "creating";
+		this.handleEl = this.createHandleEl();
+	}
+
+	createHandleEl() {
+		let handle = this.se.ui.createSvgElement("circle", true);
+		handle.setAttribute("cx", this.x);
+		handle.setAttribute("cy", this.y);
+		handle.setAttribute("r", 4);
+		handle.setAttribute("class", "handle");
+		// TODO: handles group should probably be variable in ui
+		document.getElementById("handles").appendChild(handle);
+		return handle;
+	}
+
+	toggleTy() {
+		let ty = this.ty === "corner" ? "smooth" : "corner";
+		this.changeTy(ty);
+	}
+
+	changeTy(ty) {
+		if (ty !== this.ty) {
+			if (ty === "corner") {
+				this.handleEl.classList.add("corner");
+			} else {
+				this.handleEl.classList.remove("corner");
+			}
+		}
+		this.ty = ty;
+	}
+
+	updatePos(x, y) {
+		this.x = x;
+		this.y = y;
+		this.handleEl.setAttribute("cx", x);
+		this.handleEl.setAttribute("cy", y);
+	}
+}
+
 // TODO: create UI base class rather than cutting and pasting.
 class Ui {
 	constructor() {
 		this.svgNS = "http://www.w3.org/2000/svg";
 		this.setupHandlers();
 		this.controlPts = [];
+		this.se = new SplineEdit(this);
+		this.gestureDet = new GestureDet();
 	}
 
 	setupHandlers() {
 		let svg = document.getElementById("s");
 
-		svg.addEventListener("pointermove", e => this.mousemove(e));
-		svg.addEventListener("pointerup", e => this.mouseup(e));
-		svg.addEventListener("pointerdown", e => this.mousedown(e));
+		svg.addEventListener("pointermove", e => this.pointerMove(e));
+		svg.addEventListener("pointerup", e => this.pointerUp(e));
+		svg.addEventListener("pointerdown", e => this.pointerDown(e));
 		this.mousehandler = null;
+		this.receiver = null;
 	}
 
 	attachHandler(element, handler) {
@@ -28,22 +161,41 @@ class Ui {
 		});
 	}
 
-	mousedown(e) {
+	/// This is the pattern for the new object-y style.
+
+	// Maybe just rely on closures to capture obj?
+	attachReceiver(element, receiver, obj) {
 		let svg = document.getElementById("s");
-		svg.setPointerCapture(e.pointerId);
-		this.addPoint(e.offsetX, e.offsetY);
-		this.redraw();
+		element.addEventListener("pointerdown", e => {
+			this.gestureDet.onPointerDown(e);
+			svg.setPointerCapture(e.pointerId);
+			this.receiver = receiver;
+			receiver.onPointerDown(e, obj);
+			e.stopPropagation();
+		});
 	}
 
-	mousemove(e) {
-		if (this.mousehandler != null) {
+	pointerDown(e) {
+		this.gestureDet.onPointerDown(e);
+		let svg = document.getElementById("s");
+		svg.setPointerCapture(e.pointerId);
+		this.se.onPointerDown(e, null);
+		//this.addPoint(e.offsetX, e.offsetY);
+		//this.redraw();
+	}
+
+	pointerMove(e) {
+		if (this.receiver !== null) {
+			this.receiver.onPointerMove(e);
+		} else if (this.mousehandler !== null) {
 			this.mousehandler(e);
 		}
 	}
 
-	mouseup(e) {
+	pointerUp(e) {
 		e.target.releasePointerCapture(e.pointerId);
 		this.mousehandler = null;
+		this.receiver = null;
 	}
 
 	createSvgElement(tagName, isRaw = false) {

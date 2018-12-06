@@ -4,11 +4,20 @@
 	fill: none;
 	pointer-events: all;
 }
+/* including #handles is a hack to increase specificity */
+#handles .handle:hover {
+	fill: #f00;
+}
 svg:hover .handle {
 	fill: #800;
 }
-.handle:hover {
-	fill: #f00;
+svg:hover .handle.selected {
+	fill: #fcb;
+	stroke: black;
+}
+/* TODO: this is a hack, we need dom mutation */
+svg:hover .handle.corner {
+	fill: #0f0;
 }
 </style>
 <body>
