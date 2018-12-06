@@ -1,14 +1,40 @@
 <!doctype html>
+<meta charset="utf-8">
 <style>
 .handle {
 	fill: none;
 	pointer-events: all;
 }
+/* including #handles is a hack to increase specificity */
+#handles .handle:hover {
+	fill: #f00;
+}
 svg:hover .handle {
 	fill: #800;
 }
-.handle:hover {
-	fill: #f00;
+svg:hover .selected .handle {
+	fill: #fcb;
+	stroke: black;
+}
+#handles line.target {
+	stroke: black;
+}
+#handles circle.target {
+	fill: none;
+	stroke: black;
+	stroke-opacity: 0.15;
+	stroke-width: 10;
+}
+svg:hover #handles line.tan {
+	stroke: black;
+	stroke-width: 1;
+}
+svg:hover #handles .tanhandle {
+	fill: white;
+	stroke: black;
+}
+svg:hover #handles .tanhandle:hover {
+	fill: #fcb;
 }
 </style>
 <body>

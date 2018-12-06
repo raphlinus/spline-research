@@ -2,21 +2,304 @@
 
 //! UI for drawing splines
 
+/// Fancy name for something that just detects double clicks, but might expand.
+class GestureDet {
+	constructor(ui) {
+		this.ui = ui;
+		this.lastEv = null;
+		this.lastPt = null;
+		this.clickCount = 0;
+	}
+
+	onPointerDown(ev) {
+		let dblClickThreshold = 550; // ms
+		let radiusThreshold = 5;
+		let pt = this.ui.getCoords(ev);
+		if (this.lastEv !== null) {
+			if (ev.timeStamp - this.lastEv.timeStamp > dblClickThreshold
+				|| Math.hypot(pt.x - this.lastPt.x, pt.y - this.lastPt.y) > radiusThreshold) {
+				this.clickCount = 0;
+			}
+		}
+		this.lastEv = ev;
+		this.lastPt = pt;
+		this.clickCount++;
+	}
+}
+
+// Dimensions of the tangent target
+let tanR1 = 5;
+let tanR2 = 15;
+let tanR3 = 20;
+
+/// State and UI for an editable spline
+class SplineEdit {
+	constructor(ui) {
+		this.ui = ui;
+		this.knots = [];
+		this.selection = new Set();
+		this.mode = "start";
+		this.toSmooth = false;
+	}
+
+	setSelection(sel) {
+		for (let obj of this.selection) {
+			if (!sel.has(obj)) {
+				obj.handleEl.classList.remove("selected");
+				obj.removeTanTarget();
+				obj.removeTanHandle();
+			}
+		}
+		for (let obj of sel) {
+			if (!this.selection.has(obj)) {
+				obj.handleEl.classList.add("selected");
+				if (this.mode === "dragging") {
+					obj.addTanHandle();
+				}
+			}
+		}
+		this.selection = sel;
+	}
+
+	onPointerDown(ev, obj) {
+		let pt = this.ui.getCoords(ev);
+		if (obj === null) {
+			let knot = new Knot(this, pt.x, pt.y, "corner");
+			this.knots.push(knot);
+			this.ui.attachReceiver(knot.handleEl, this, knot);
+			// TODO: setter rather than state change?
+			this.ui.receiver = this;
+			this.setSelection(new Set([knot]));
+			knot.addTanTarget();
+			this.mode = "creating";
+			this.initPt = pt;
+		} else if (obj instanceof TanHandle) {
+			obj.knot.removeTanHandle();
+			this.mode = "tanhandle";
+			// This suggests maybe we should use selected point, not initPt
+			this.initPt = new Vec2(obj.knot.x, obj.knot.y);
+			this.setSelection(new Set([obj.knot]));
+			obj.knot.addTanTarget();
+		} else {
+			this.mode = "dragging";
+			if (this.ui.gestureDet.clickCount > 1) {
+				if (obj.ty === "corner") {
+					this.initPt = new Vec2(obj.x, obj.y);
+					this.mode = "tanhandle";
+					obj.addTanTarget();
+					this.toSmooth = true;
+				} else {
+					obj.setTy("corner");
+					obj.removeTanHandle();
+					obj.setTan(null);
+				}
+			}
+			var sel = new Set([obj]);
+			if (this.mode === "dragging" && (ev.shiftKey || this.selection.has(obj))) {
+				for (let a of this.selection) {
+					sel.add(a);
+				}
+			}
+			this.setSelection(sel);
+		}
+		this.lastPt = pt;
+	}
+
+	onPointerMove(ev) {
+		let pt = this.ui.getCoords(ev);
+		let dx = pt.x - this.lastPt.x;
+		let dy = pt.y - this.lastPt.y;
+		if (this.mode === "dragging") {
+			for (let knot of this.selection) {
+				knot.updatePos(knot.x + dx, knot.y + dy);
+			}
+		} else if (this.mode === "creating" || this.mode === "tanhandle") {
+			let r = Math.hypot(pt.x - this.initPt.x, pt.y - this.initPt.y);
+			let ty = r < tanR1 ? "corner" : "smooth";
+			var th = null;
+			if (r >= tanR1 && r < 2 * tanR3 - tanR2) {
+				this.toSmooth = false;
+				th = Math.atan2(pt.y - this.initPt.y, pt.x - this.initPt.x);
+				if (r < tanR2) {
+					th = Math.PI / 2 * Math.round(th * (2 / Math.PI));
+				}
+			}
+			for (let knot of this.selection) {
+				knot.setTy(ty);
+				knot.setTan(th, tanR3);
+			}
+		}
+		this.lastPt = pt;
+	}
+
+	onPointerUp(ev) {
+		for (let knot of this.selection) {
+			if (this.toSmooth) {
+				knot.setTy("smooth");
+				this.toSmooth = false;
+			}
+			knot.removeTanTarget();
+			if (this.mode === "creating" || this.mode === "tanhandle") {
+				knot.addTanHandle();
+			}
+		}
+		this.mode = "start";
+	}
+}
+
+class Knot {
+	/// ty is one of 'corner', 'smooth'.
+	constructor(se, x, y, ty) {
+		this.se = se;
+		this.x = x;
+		this.y = y;
+		this.ty = ty;
+		this.th = null;
+
+		this.handleEl = this.createHandleEl();
+	}
+
+	createHandleEl() {
+		let handle = this.se.ui.createSvgElement("g", true);
+		handle.setAttribute("class", "handle");
+		handle.setAttribute("transform", `translate(${this.x} ${this.y})`);
+		// TODO: handles group should probably be variable in ui
+		document.getElementById("handles").appendChild(handle);
+		let inner = this.renderHandleEl();
+		handle.appendChild(inner);
+		return handle;
+	}
+
+	renderHandleEl() {
+		let r = 4;
+		let inner;
+		if (this.ty === "corner") {
+			inner = this.se.ui.createSvgElement("rect", true);
+			inner.setAttribute("x", -r);
+			inner.setAttribute("y", -r);
+			inner.setAttribute("width", r * 2);
+			inner.setAttribute("height", r * 2);
+		} else {
+			inner = this.se.ui.createSvgElement("circle", true);
+			inner.setAttribute("cx", 0);
+			inner.setAttribute("cy", 0);
+			inner.setAttribute("r", r);
+		}
+		inner.setAttribute("class", "handle");
+		return inner;			
+	}
+
+	addTanTarget() {
+		for (var i = 0; i < 4; i++) {
+			let th = i * (Math.PI / 2);
+			let s = Math.sin(th);
+			let c = Math.cos(th);
+			let line = this.se.ui.createSvgElement("line");
+			line.setAttribute("x1", tanR1 * c);
+			line.setAttribute("y1", tanR1 * s);
+			line.setAttribute("x2", tanR2 * c);
+			line.setAttribute("y2", tanR2 * s);
+			line.setAttribute("class", "target");
+			this.handleEl.appendChild(line);
+
+		}
+		let circle = this.se.ui.createSvgElement("circle");
+		circle.setAttribute("cx", 0);
+		circle.setAttribute("cy", 0);
+		circle.setAttribute("r", tanR3);
+		circle.setAttribute("class", "target");
+		this.handleEl.appendChild(circle);
+	}
+
+	removeTanTarget() {
+		for (let child of this.handleEl.querySelectorAll(".target")) {
+			this.handleEl.removeChild(child);
+		}
+	}
+
+	setTan(th, r) {
+		for (let child of this.handleEl.querySelectorAll(".tan")) {
+			this.handleEl.removeChild(child);
+		}
+		if (th !== null) {
+			let line = this.se.ui.createSvgElement("line");
+			line.setAttribute("x1", -r * Math.cos(th));
+			line.setAttribute("y1", -r * Math.sin(th));
+			line.setAttribute("x2", r * Math.cos(th));
+			line.setAttribute("y2", r * Math.sin(th));
+			line.setAttribute("class", "tan");
+			this.handleEl.appendChild(line);
+		}
+		this.th = th;
+	}
+
+	addTanHandle() {
+		let th = this.th;
+		if (th !== null) {
+			this.setTan(th, tanR2);
+			let circle = this.se.ui.createSvgElement("circle", true);
+			circle.setAttribute("cx", tanR2 * Math.cos(this.th));
+			circle.setAttribute("cy", tanR2 * Math.sin(th));
+			circle.setAttribute("r", 3);
+			circle.setAttribute("class", "tanhandle");
+			this.handleEl.appendChild(circle);
+			let tanHandle = new TanHandle(this);
+			// To be more object oriented, receiver might be the knot or tanHandle. Ah well.
+			this.se.ui.attachReceiver(circle, this.se, tanHandle);
+		}
+	}
+
+	removeTanHandle() {
+		// Maybe DRY?
+		for (let child of this.handleEl.querySelectorAll(".tanhandle")) {
+			this.handleEl.removeChild(child);
+		}
+	}
+
+	toggleTy() {
+		let ty = this.ty === "corner" ? "smooth" : "corner";
+		this.setTy(ty);
+	}
+
+	setTy(ty) {
+		if (ty !== this.ty) {
+			this.ty = ty;
+			let oldHandle = this.handleEl.querySelector(".handle");
+			this.handleEl.replaceChild(this.renderHandleEl(), oldHandle);
+		}
+	}
+
+	updatePos(x, y) {
+		this.x = x;
+		this.y = y;
+		this.handleEl.setAttribute("transform", `translate(${x} ${y})`);
+	}
+}
+
+class TanHandle {
+	constructor(knot) {
+		this.knot = knot;
+	}
+}
+
 // TODO: create UI base class rather than cutting and pasting.
 class Ui {
 	constructor() {
 		this.svgNS = "http://www.w3.org/2000/svg";
 		this.setupHandlers();
 		this.controlPts = [];
+		this.se = new SplineEdit(this);
+		this.gestureDet = new GestureDet(this);
 	}
 
 	setupHandlers() {
 		let svg = document.getElementById("s");
 
-		svg.addEventListener("pointermove", e => this.mousemove(e));
-		svg.addEventListener("pointerup", e => this.mouseup(e));
-		svg.addEventListener("pointerdown", e => this.mousedown(e));
+		svg.addEventListener("pointermove", e => this.pointerMove(e));
+		svg.addEventListener("pointerup", e => this.pointerUp(e));
+		svg.addEventListener("pointerdown", e => this.pointerDown(e));
 		this.mousehandler = null;
+		this.receiver = null;
 	}
 
 	attachHandler(element, handler) {
@@ -28,22 +311,54 @@ class Ui {
 		});
 	}
 
-	mousedown(e) {
+	/// This is the pattern for the new object-y style.
+
+	// Maybe just rely on closures to capture obj?
+	attachReceiver(element, receiver, obj) {
 		let svg = document.getElementById("s");
-		svg.setPointerCapture(e.pointerId);
-		this.addPoint(e.offsetX, e.offsetY);
-		this.redraw();
+		element.addEventListener("pointerdown", e => {
+			this.gestureDet.onPointerDown(e);
+			svg.setPointerCapture(e.pointerId);
+			this.receiver = receiver;
+			receiver.onPointerDown(e, obj);
+			e.stopPropagation();
+		});
 	}
 
-	mousemove(e) {
-		if (this.mousehandler != null) {
+	pointerDown(e) {
+		this.gestureDet.onPointerDown(e);
+		let svg = document.getElementById("s");
+		svg.setPointerCapture(e.pointerId);
+		this.se.onPointerDown(e, null);
+		//this.addPoint(e.offsetX, e.offsetY);
+		//this.redraw();
+	}
+
+	pointerMove(e) {
+		if (this.receiver !== null) {
+			this.receiver.onPointerMove(e);
+		} else if (this.mousehandler !== null) {
 			this.mousehandler(e);
 		}
 	}
 
-	mouseup(e) {
+	pointerUp(e) {
+		if (this.receiver !== null) {
+			this.receiver.onPointerUp(e);
+		}
 		e.target.releasePointerCapture(e.pointerId);
 		this.mousehandler = null;
+		this.receiver = null;
+	}
+
+	// On Chrome, just offsetX, offsetY work, but on FF it takes the group transforms
+	// into account. We always want coords relative to the SVG.
+	getCoords(e) {
+		let svg = document.getElementById("s");
+		let rect = svg.getBoundingClientRect();
+		let x = e.clientX - rect.left;
+		let y = e.clientY - rect.top;
+		return new Vec2(x, y);
 	}
 
 	createSvgElement(tagName, isRaw = false) {
