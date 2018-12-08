@@ -15,6 +15,10 @@
 
 //! Explorer for optimized Euler spiral to bezier conversion.
 
+/// Polyfill for working around ancient browsers that don't support pointer events.
+let hasPointerEvent = 'PointerEvent' in window;
+let pointerName = hasPointerEvent ? 'pointer' : 'mouse';
+
 /// A simple container for 2-vectors
 class Vec2 {
 	constructor(x, y) {
@@ -286,8 +290,8 @@ function lookupArms(th0, th1) {
 class Ui {
 	constructor() {
 		let svg = document.getElementById("s");
-		svg.addEventListener("pointermove", e => this.mousemove(e));
-		svg.addEventListener("pointerup", e => this.mouseup(e));
+		svg.addEventListener(pointerName + "move", e => this.mousemove(e));
+		svg.addEventListener(pointerName + "up", e => this.mouseup(e));
 		this.mousehandler = null;
 
 		this.attach_handler("map", this.map_handler);
@@ -303,9 +307,14 @@ class Ui {
 	attach_handler(id, handler) {
 		let element = document.getElementById(id);
 		let svg = document.getElementById("s");
-		element.addEventListener("pointerdown", e => {
-			svg.setPointerCapture(e.pointerId);
+		element.addEventListener(pointerName + "down", e => {
+			if (hasPointerEvent) {
+				// TODO: is there some way to get reasonably good mouse capture if
+				// pointer events are not supported?
+				svg.setPointerCapture(e.pointerId);
+			}
 			this.mousehandler = handler;
+			e.preventDefault();
 		});
 	}
 
@@ -313,11 +322,15 @@ class Ui {
 		if (this.mousehandler != null) {
 			this.mousehandler(e);
 		}
+		e.preventDefault();
 	}
 
 	mouseup(e) {
-		e.target.releasePointerCapture(e.pointerId);
+		if (hasPointerEvent) {
+			e.target.releasePointerCapture(e.pointerId);
+		}
 		this.mousehandler = null;
+		e.preventDefault();
 	}
 
 	left_th_handler(e) {

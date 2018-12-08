@@ -6,6 +6,9 @@
 html {
 	font-family: Lato;
 }
+svg {
+	touch-action: none;
+}
 .th_handle {
 	stroke: #800;
 	fill: #800;
@@ -38,6 +41,7 @@ html {
 </style>
 <body>
 	<h1>Euler spiral to Bézier conversion explorer</h1>
+	<p>Click and drag anywhere on the image (or the Bézier control handles).</p>
 	<svg id="s" width="800" height="480" pointer-events="all">
 		<image id="map" xlink:href="map.png" x="0" y="0" width="400" height="400" pointer-events="all"/>
 		<!-- chord line -->
