@@ -22,6 +22,15 @@ html {
 	stroke-width: 2;
 	fill: none;
 }
+#euler {
+	stroke: red;
+	stroke-width: 2;
+	fill: none;
+}
+#euler-curv {
+	stroke: red;
+	fill: none;
+}
 #curv {
 	stroke: blue;
 	fill: none;
@@ -37,7 +46,9 @@ html {
 		<circle id="left_th" class="th_handle" cx="500" cy="200" r="3" />
 		<line id="right_arm" class="arm" x1="700" y1="200" x2="700" y2="200" />
 		<circle id="right_th" class="th_handle" cx="700" cy="200" r="3" />
+		<path id="euler" d="" pointer-events="none" />
 		<path id="bez" d="" pointer-events="none" />
+		<path id="euler-curv" d="" pointer-events="none" />
 		<path id="curv" d="" pointer-events="none" />
 		<line id="curv-base" x1="500" y1="300" x2="700" y2="300" stroke="black" pointer-events="none" />
 		<g id="plots" />
