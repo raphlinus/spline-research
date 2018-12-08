@@ -10,7 +10,7 @@ def compute_arms(th0, th1):
 	print s1, curve.arclen
 	bzs = draw_cornu.pcorn_segment_to_bzs(curve, s0, s1, 1, 1e9)
 	a0 = math.hypot(bzs[0][1][0], bzs[0][1][1])
-	a1 = math.hypot(1 - bzs[0][2][0], bzs[0][1][1])
+	a1 = math.hypot(1 - bzs[0][2][0], bzs[0][2][1])
 	return (a0, a1)
 
 def plot_arms():
@@ -23,7 +23,7 @@ def plot_arms():
 		for j in range(n + 1):
 			th1 = thmin + (thmax - thmin) * j / n
 			a0, a1 = compute_arms(th0, th1)
-			print >> f, th0, th1, a0
+			print >> f, th0, th1, a0, a1
 		print >> f
 
 plot_arms()

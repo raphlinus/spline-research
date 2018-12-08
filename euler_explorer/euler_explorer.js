@@ -163,6 +163,9 @@ class Ui {
 		let el = document.getElementById("left_th");
 		el.setAttribute("cx", x0 + 200 * x);
 		el.setAttribute("cy", 200 - 200 * y);
+		let arm = document.getElementById("left_arm");
+		arm.setAttribute("x2", x0 + 200 * x);
+		arm.setAttribute("y2", 200 - 200 * y);		
 	}
 
 	setRightHandle(x, y) {
@@ -171,6 +174,9 @@ class Ui {
 		let el = document.getElementById("right_th");
 		el.setAttribute("cx", x0 + 200 * x);
 		el.setAttribute("cy", 200 - 200 * y);
+		let arm = document.getElementById("right_arm");
+		arm.setAttribute("x2", x0 + 200 * x);
+		arm.setAttribute("y2", 200 - 200 * y);		
 	}
 
 	map_handler(e) {

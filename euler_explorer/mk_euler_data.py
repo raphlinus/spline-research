@@ -19,8 +19,8 @@ for i in range(len(raw)//2, len(raw)):
 	jsfile.write(str(raw2[i]) + ',\n')
 jsfile.write(']);')
 
-
-print(n, max(raw))
+max_raw = max(raw)
+print(n, max_raw)
 
 # From https://github.com/BIDS/colormap/blob/master/colormaps.py
 # Original under CC0 license
@@ -286,6 +286,6 @@ imgfile.write(bytes('P6\n' + str(n) + ' ' + str(n)  + '\n255\n', 'utf-8'))
 for y in range(n):
 	for x in range(n):
 		z = raw[x * n + n - 1 - y]
-		zint = math.floor(z * 255 / 1.25)
+		zint = math.floor(z * 255 / max_raw + 0.5)
 		r, g, b = [math.floor(255 * z) for z in _viridis_data[zint]]
 		imgfile.write(struct.pack('BBB', r, g, b))
