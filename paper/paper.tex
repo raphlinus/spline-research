@@ -49,9 +49,19 @@ Perhaps the most striking example is the Minimum Energy Curve (MEC). Defining a 
 
 The MEC has a number of drawbacks; most notably it tends to produce curves of lower tension (longer length) than intuitively desirable, as bending energy scales inversely with curve length. Of the approaches to increase tension, perhaps the most effective is the Euler spiral spline, which fits segments of the Euler spiral, or, equivalently, defines curve segments as having curvature linear in arclength. The resulting splines are quite pleasing and have a number of desirable properties, but also a significant drawback: at large bending angles, there is not a unique solution, and a solver tends to ``flip'' suddenly from one configuration to another, even for small perturbations of the control points. This is likely a major reason Euler spliral splines have not been adopted more widely (certainly as argued by Yan et al \cite{Yan:2017:KCI:3072959.3073692}).
 
+The curvature map of the Euler spiral is shown in Figure \ref{euler_kmap}. For this region of the parameter space (angles between $-\pi/2$ and $\pi/2$), it is very smooth, almost linear, and curvature is bounded.
+
+\begin{figure}
+\centering
+\includegraphics[scale=0.5]{euler_kmap}
+\caption{Curvature map of Euler spiral}
+\label{euler_kmap}
+\end{figure}
+
 Both MEC and Euler spiral splines are \emph{extensional,} meaning that refining a spline by placing an additional control point on the curve does not change the spline. As my thesis explains, extensional 2-parameter splines are quite restricted; all curves must be sections of a fixed generating curve.
 
 Another spline that fits into the two-parameter framework is the \emph{circle spline} of S{\'e}quin et al \cite{DBLP:journals/cad/SequinLY05}. In this spline, the curvature at an endpoint is fixed as that of the unique circle passing through the tangent constraint at that endpoint and intersecting the other endpoint. Circle splines have excellent \emph{locality} but fails extensionality quite dramatically (producing particularly lumpy results when placing a new point near an inflection).
+
 
 \subsection{Analysis of \kcurve{}s in 2-parameter framework}
 
@@ -72,6 +82,13 @@ This spline has strikingly different properties than the others listed above. It
 
 Looking at the curvature map of the bi-parabola curve family reveals a number of fascinating properties. Most notably, the curvature map is periodic in both endpoint tangents, both with period $\pi$. Near a tangent angle of $\pi/2$, the curve forms a \emph{cusp} of infinite curvature, and a reversal of direction. One way or another, the curve has to reverse direction as the tangent goes through its full rotation; with bounded curvature it must flip, so going smoothly through a cusp seems the only other option.
 
+\begin{figure}
+\centering
+\includegraphics[scale=0.5]{biparab_kmap}
+\caption{Curvature map of bi-parabola}
+\label{biparab_kmap}
+\end{figure}
+
 The \kcurve{} is not extensible, and deviation from roundness is high. It is not monotone curvature, but preserves half of that property - no curvature \emph{maxima} are allowed, while curvature minima are not only allowed but mandatory in the non-inflectional case.
 
 \subsection{Variations on the 2-parameter framework}
@@ -88,11 +105,9 @@ A 4-parameter scheme produces splines with G4 continuity. Existing 4-parameter s
 
 This paper proposes a new spline, fairly simple and easy to compute, that combines the robustness of the \kcurve{} spline with the fine qualities of the Euler spiral spline when the control polygon has low bending angles. In fact, it approximates Euler spiral fairly closely as angles decrease.
 
-The main design principle is to produce a curvature map that grossly resembles the bi-parabola, to capture desirable properties of the \kcurve{} spline, while approximating the Euler spiral's near the center. As in the bi-parabola, the curvature map is periodic (with period $\pi$ in both tangent angles) and forms cusps at extreme angles.
+First, the formula for the spline is given. As in the Hobby spline, the two-parameter curve family is a single cubic B{\'ezier} segment between each pair of control points. The tangents are given by the parameters.
 
-Following the example of the Hobby spline \cite{Hobby85}, a suitably parametrized cubic B{\'e}zier segment can approximate Euler spiral segments for low angles, and we also find (not terribly surprisingly) that it can also form cusps at high angles resembling parabolas.
-
-A cubic B{\'e}zier has two internal control points. Both must lie on the line tangent to the corresponding endpoint, in order to enforce the given tangent constraint. That leaves merely the length the control arm (the signed distance from the endpoint to the control point along the tangent vector) as a free parameter. We empirically determined a simple function for the left control arm length, as a function of $\theta_0$ and $\theta_1$; the right arm is symmetrical:
+A cubic B{\'e}zier has two internal control points. Both must lie on the line tangent to the corresponding endpoint, in order to enforce the given tangent constraint. That leaves merely the length the control arm (the signed distance from the endpoint to the control point along the tangent vector) as a free parameter. The new spline uses this simple function for the left control arm length, as a function of $\theta_0$ and $\theta_1$; the right arm is symmetrical:
 
 \[
 \begin{aligned}
@@ -100,6 +115,31 @@ A cubic B{\'e}zier has two internal control points. Both must lie on the line ta
 \theta_a & = \theta_0 - 0.3 \sin (2\theta_1 - 0.4\sin 2\theta_1) \\
 \end{aligned}
 \]
+
+Then, given this two-parameter curve, use a global solver to choose tangents so that the curvature is matched on both sides of each control point. A Newton-style solver as in my thesis will work, but requires a bit more care to make sure that both direction and curvature match, given the possibility of reversals. It also has to cope with curvature being unbounded, as opposed to the bounded curvature of previously published two parameter splines.
+
+For small angles, this spline is quite similar to the Hobby spline; in fact, both can be seen as small-angle approximations to the Euler spiral. But as angles increase, instead of less accurate and more ``globby'' approximations to the Euler spiral shape, the length of the curve creases, and ultimately forms an infinite curvature cusp; beyond that angle, the direction reverses. Its curvature map is periodic (with period $\pi$ in both tangent angles), and grossly similar in this way to the bi-parabola, and so we expect the spline to have similar robustness as the \kcurve spline.
+
+Because it approximates the Euler spiral, the new curve easily handles inflection points, with smooth variation of curvature on either side of the inflection. The new spline has three important elements, which together make it have the desired properties:
+
+\begin{itemize}
+
+\item It is a two-parameter spline with G2 continuity at the control points.
+
+\item The curvature map is periodic, with cusps formed at high angles.
+
+\item The curve family smoothly transitions through zero-curvature inflection points.
+
+\end{itemize}
+
+The curvature map is shown in Figure \ref{newcurve_kmap}.
+
+\begin{figure}
+\centering
+\includegraphics[scale=0.5]{newcurve_kmap}
+\caption{Curvature map of new spline curve family}
+\label{newcurve_kmap}
+\end{figure}
 
 Three families of curves are shown in the following figure, the Euler spiral in red, the bi-parabola in green, and the new curve in blue. The horizontal axis is the left tangent angle, and vertical is the right tangent angle, both in 15 degree increments.
 

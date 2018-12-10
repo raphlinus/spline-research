@@ -27,24 +27,35 @@ function plotFamily(curve) {
 
 /// Make a curvature map of a two param curve, suitable for gnuplot
 function makeCurvatureMap(curve) {
-	let n = 100;
+	let n = 50;
+	let mapScaling = "none";
 	for (var j = 0; j < n; j++) {
 		let th1 = -Math.PI/2 + Math.PI * j / (n - 1);
 		for (var i = 0; i < n; i++) {
 			let th0 = -Math.PI/2 + Math.PI * i / (n - 1);
 			let atanK = curve.computeCurvature(th0, th1).ak0;
-			let k = 0.25 * Math.tan(atanK);
-			var scaled = Math.asin((Math.sqrt(4 * k * k + 1) - 1) / (2 * k));
-			if (atanK > Math.PI / 2) {
-				scaled = scaled + Math.PI;
-			} else if (atanK < -Math.PI / 2) {
-				scaled = scaled - Math.PI;
+			let k = Math.tan(atanK);
+			let toPlot;
+			if (mapScaling === "none") {
+				toPlot = k;
+			} else if (mapScaling === "atan") {
+				toPlot = atanK;
+			} else if (mapScaling === "sincos2") {
+				// Somewhat arbitrary scaling parameter here...
+				let k1 = 0.25 * k;
+				var scaled = Math.asin((Math.sqrt(4 * k1 * k1 + 1) - 1) / (2 * k1));
+				if (atanK > Math.PI / 2) {
+					scaled = scaled + Math.PI;
+				} else if (atanK < -Math.PI / 2) {
+					scaled = scaled - Math.PI;
+				}
+				toPlot = scaled;
 			}
-			console.log(`${th0} ${th1} ${scaled}`);
+			console.log(`${th0} ${th1} ${toPlot}`);
 		}
 		console.log('');
 	}
 }
 
-makeCurvatureMap(new MyCurve);
+makeCurvatureMap(new BiParabola);
 //plotFamily(new MyCurve);
