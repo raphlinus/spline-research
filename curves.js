@@ -259,6 +259,8 @@ class TwoParamSpline {
 	constructor(curve, ctrlPts) {
 		this.curve = curve;
 		this.ctrlPts = ctrlPts;
+		this.startTh = null;
+		this.endTh = null;
 	}
 
 	/// Determine initial tangent angles, given array of Vec2 control points.
@@ -278,6 +280,12 @@ class TwoParamSpline {
 			ths[i] = th;
 			if (i == 1) { ths[0] = th0; }
 			if (i == ths.length - 2) { ths[i + 1] = th1; }
+		}
+		if (this.startTh !== null) {
+			ths[0] = this.startTh;
+		}
+		if (this.endTh !== null) {
+			ths[ths.length - 1] = this.endTh;
 		}
 		this.ths = ths;
 		return ths;
@@ -310,13 +318,17 @@ class TwoParamSpline {
 		}
 
 		let n = this.ctrlPts.length;
-		if (n < 3) return 0;
 		// Fix endpoint tangents; we rely on iteration for this to converge
-		ths0 = this.getThs(0);
-		this.ths[0] += this.curve.endpointTangent(ths0.th1) - ths0.th0;
+		if (this.startTh === null) {
+			let ths0 = this.getThs(0);
+			this.ths[0] += this.curve.endpointTangent(ths0.th1) - ths0.th0;
+		}
 
-		ths0 = this.getThs(n - 2);
-		this.ths[n - 1] -= this.curve.endpointTangent(ths0.th0) - ths0.th1;
+		if (this.endTh === null) {
+			let ths0 = this.getThs(n - 2);
+			this.ths[n - 1] -= this.curve.endpointTangent(ths0.th0) - ths0.th1;
+		}
+		if (n < 3) return 0;
 
 		var absErr = 0;
 		var x = new Float64Array(n - 2);
@@ -428,7 +440,8 @@ class Spline {
 			let ptI = this.ctrlPts[i];
 			let ptI1 = this.ctrlPts[i + 1];
 			// Assume point i is a corner point (this will change when we have closed paths).
-			if (i + 2 == this.ctrlPts.length || ptI1.ty === "corner") {
+			if ((i + 2 == this.ctrlPts.length || ptI1.ty === "corner")
+				&& ptI.th === null && ptI1.th === null) {
 				let dx = ptI1.pt.x - ptI.pt.x;
 				let dy = ptI1.pt.y - ptI.pt.y;
 				let th = Math.atan2(dy, dx);
@@ -443,12 +456,14 @@ class Spline {
 					let ptJ = this.ctrlPts[j];
 					innerPts.push(ptJ.pt);
 					j += 1;
-					if (ptJ.ty === "corner") {
+					if (ptJ.ty === "corner" || ptJ.th !== null) {
 						break;
 					}
 				}
 				//console.log(innerPts);
 				let inner = new TwoParamSpline(this.curve, innerPts);
+				inner.startTh = this.ctrlPts[i].th;
+				inner.endTh = this.ctrlPts[j - 1].th;
 				let nIter = 10;
 				inner.initialThs();
 				for (let k = 0; k < nIter; k++) {
