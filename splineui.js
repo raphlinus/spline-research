@@ -80,6 +80,7 @@ class SplineEdit {
 			this.initPt = new Vec2(obj.knot.x, obj.knot.y);
 			this.setSelection(new Set([obj.knot]));
 			obj.knot.addTanTarget();
+			obj.knot.setTan(obj.knot.th, tanR3);
 		} else {
 			this.mode = "dragging";
 			if (this.ui.gestureDet.clickCount > 1) {
@@ -94,7 +95,7 @@ class SplineEdit {
 					obj.setTan(null);
 				}
 			}
-			var sel = new Set([obj]);
+			let sel = new Set([obj]);
 			if (this.mode === "dragging" && (ev.shiftKey || this.selection.has(obj))) {
 				for (let a of this.selection) {
 					sel.add(a);
@@ -102,6 +103,7 @@ class SplineEdit {
 			}
 			this.setSelection(sel);
 		}
+		this.render();
 		this.lastPt = pt;
 	}
 
@@ -116,7 +118,7 @@ class SplineEdit {
 		} else if (this.mode === "creating" || this.mode === "tanhandle") {
 			let r = Math.hypot(pt.x - this.initPt.x, pt.y - this.initPt.y);
 			let ty = r < tanR1 ? "corner" : "smooth";
-			var th = null;
+			let  th = null;
 			if (r >= tanR1 && r < 2 * tanR3 - tanR2) {
 				this.toSmooth = false;
 				th = Math.atan2(pt.y - this.initPt.y, pt.x - this.initPt.x);
@@ -129,6 +131,7 @@ class SplineEdit {
 				knot.setTan(th, tanR3);
 			}
 		}
+		this.render();
 		this.lastPt = pt;
 	}
 
@@ -137,6 +140,7 @@ class SplineEdit {
 			if (this.toSmooth) {
 				knot.setTy("smooth");
 				this.toSmooth = false;
+				this.render();
 			}
 			knot.removeTanTarget();
 			if (this.mode === "creating" || this.mode === "tanhandle") {
@@ -144,6 +148,18 @@ class SplineEdit {
 			}
 		}
 		this.mode = "start";
+	}
+
+	render() {
+		let ctrlPts = [];
+		for (let knot of this.knots) {
+			let pt = new ControlPoint(new Vec2(knot.x, knot.y), knot.ty, knot.th);
+			ctrlPts.push(pt);
+		}
+		let spline = new Spline(ctrlPts);
+		spline.solve();
+		let path = spline.renderSvg();
+		document.getElementById("spline").setAttribute("d", path);
 	}
 }
 
@@ -190,7 +206,7 @@ class Knot {
 	}
 
 	addTanTarget() {
-		for (var i = 0; i < 4; i++) {
+		for (let i = 0; i < 4; i++) {
 			let th = i * (Math.PI / 2);
 			let s = Math.sin(th);
 			let c = Math.cos(th);
@@ -403,8 +419,8 @@ class Ui {
 
 	redraw() {
 		this.resetPlots();
-		var path = "";
-		var cmd = "M";
+		let path = "";
+		let cmd = "M";
 		for (let pt of this.controlPts) {
 			path += `${cmd}${pt.x} ${pt.y}`;
 			cmd = " L";
@@ -419,7 +435,7 @@ class Ui {
 		if (showMyCurve) {
 			let spline = new TwoParamSpline(new MyCurve, this.controlPts);
 			let ths = spline.initialThs();
-			for (var i = 0; i < nIter; i++) {
+			for (let i = 0; i < nIter; i++) {
 				spline.iterDumb(i);
 			}
 			let splinePath = spline.renderSvg();
@@ -427,13 +443,13 @@ class Ui {
 		}
 
 		if (showBiParabola) {
-			var pts = [];
-			for (var pt of this.controlPts) {
+			let pts = [];
+			for (let pt of this.controlPts) {
 				pts.push(new Vec2(pt.x + spline2Offset, pt.y));
 			}
 			let spline2 = new TwoParamSpline(new BiParabola, pts);
 			spline2.initialThs();
-			for (var i = 0; i < nIter; i++) {
+			for (let i = 0; i < nIter; i++) {
 				let absErr = spline2.iterDumb(i);
 				if (i == nIter - 1) {
 					console.log(`biparabola err: ${absErr}`);
@@ -444,7 +460,7 @@ class Ui {
 		}
 
 		/*
-		for (var i = 0; i < ths.length; i++) {
+		for (let i = 0; i < ths.length; i++) {
 			let pt = this.controlPts[i]
 			this.tangentMarker(pt.x, pt.y, -ths[i]);
 		}

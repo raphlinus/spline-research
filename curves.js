@@ -394,8 +394,8 @@ class TwoParamSpline {
 	renderSvg() {
 		let c = this.ctrlPts;
 		if (c.length == 0) { return ""; }
-		var path = `M${c[0].x} ${c[0].y}`;
-		var cmd = " C";
+		let path = `M${c[0].x} ${c[0].y}`;
+		let cmd = " C";
 		for (var i = 0; i < c.length - 1; i++) {
 			let ths = this.getThs(i);
 			let render = this.curve.render(ths.th0, ths.th1);
@@ -411,5 +411,94 @@ class TwoParamSpline {
 			path += ` ${c[i + 1].x} ${c[i + 1].y}`;
 		}
 		return path;
+	}
+}
+
+/// Spline handles more general cases, including corners.
+class Spline {
+	constructor(ctrlPts, isClosed) {
+		this.ctrlPts = ctrlPts;
+		this.isClosed = isClosed;
+		this.curve = new MyCurve();
+	}
+
+	solve() {
+		var i = 0;
+		while (i + 1 < this.ctrlPts.length) {
+			let ptI = this.ctrlPts[i];
+			let ptI1 = this.ctrlPts[i + 1];
+			// Assume point i is a corner point (this will change when we have closed paths).
+			if (i + 2 == this.ctrlPts.length || ptI1.ty === "corner") {
+				let dx = ptI1.pt.x - ptI.pt.x;
+				let dy = ptI1.pt.y - ptI.pt.y;
+				let th = Math.atan2(dy, dx);
+				ptI.rTh = th;
+				ptI1.lTh = th;
+				i += 1;
+			} else {
+				// We have a curve.
+				let innerPts = [ptI.pt];
+				let j = i + 1;
+				while (j < this.ctrlPts.length) {
+					let ptJ = this.ctrlPts[j];
+					innerPts.push(ptJ.pt);
+					j += 1;
+					if (ptJ.ty === "corner") {
+						break;
+					}
+				}
+				//console.log(innerPts);
+				let inner = new TwoParamSpline(this.curve, innerPts);
+				let nIter = 10;
+				inner.initialThs();
+				for (let k = 0; k < nIter; k++) {
+					inner.iterDumb(k);
+				}
+				for (let k = i; k + 1 < j; k++) {
+					this.ctrlPts[k].rTh = inner.ths[k - i];
+					this.ctrlPts[k + 1].lTh = inner.ths[k + 1 - i];
+				}
+
+				i = j - 1;
+			}
+		}
+	}
+
+	renderSvg() {
+		if (this.ctrlPts.length == 0) {
+			return "";
+		}
+		let pt0 = this.ctrlPts[0];
+		let path = `M${pt0.pt.x} ${pt0.pt.y}`;
+		let i = 0;
+		let cmd = " C";
+		for (let i = 0; i + 1 < this.ctrlPts.length; i++) {
+			let ptI = this.ctrlPts[i];
+			let ptI1 = this.ctrlPts[i + 1];
+			let dx = ptI1.pt.x - ptI.pt.x;
+			let dy = ptI1.pt.y - ptI.pt.y;
+			let chth = Math.atan2(dy, dx);
+			let th0 = mod2pi(ptI.rTh - chth);
+			let th1 = mod2pi(chth - ptI1.lTh);
+			let render = this.curve.render(th0, th1);
+			for (let j = 0; j < render.length; j++) {
+				let pt = render[j];
+				let x = ptI.pt.x + dx * pt.x - dy * pt.y;
+				let y = ptI.pt.y + dy * pt.x + dx * pt.y;
+				path += `${cmd}${x} ${y}`;
+				cmd = " ";
+			}
+			path += ` ${ptI1.pt.x} ${ptI1.pt.y}`;
+		}
+		return path;
+	}
+}
+
+/// ControlPoint is a lot like `Knot` but has no UI, is used for spline solving.
+class ControlPoint {
+	constructor(pt, ty, th) {
+		this.pt = pt;
+		this.ty = ty;
+		this.th = th;
 	}
 }
