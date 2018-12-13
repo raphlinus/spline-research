@@ -1,6 +1,9 @@
 <!doctype html>
 <meta charset="utf-8">
 <style>
+svg {
+	touch-action: none;
+}
 .handle {
 	fill: none;
 	pointer-events: all;
@@ -46,6 +49,7 @@ svg:hover #handles .tanhandle:hover {
 		<g id="plots" />
 	</svg>
 </body>
+<script src="bezpath.js"></script>
 <script src="curves.js"></script>
 <script src="biparabola.js"></script>
 <script src="splineui.js"></script>

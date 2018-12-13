@@ -37,6 +37,7 @@ class SplineEdit {
 	constructor(ui) {
 		this.ui = ui;
 		this.knots = [];
+		this.bezpath = new BezPath;
 		this.selection = new Set();
 		this.mode = "start";
 		this.toSmooth = false;
@@ -64,14 +65,26 @@ class SplineEdit {
 	onPointerDown(ev, obj) {
 		let pt = this.ui.getCoords(ev);
 		if (obj === null) {
-			let knot = new Knot(this, pt.x, pt.y, "corner");
-			this.knots.push(knot);
+			let subdivideDist = 5;
+			let ty = ev.altKey ? "smooth" : "corner";
+			let hit = this.bezpath.hitTest(pt.x, pt.y);
+			let insIx = this.knots.length;
+			if (hit.bestDist < subdivideDist) {
+				ty = "smooth";
+				insIx = hit.bestMark + 1;
+			}
+			let knot = new Knot(this, pt.x, pt.y, ty);
+			this.knots.splice(insIx, 0, knot);
 			this.ui.attachReceiver(knot.handleEl, this, knot);
 			// TODO: setter rather than state change?
 			this.ui.receiver = this;
 			this.setSelection(new Set([knot]));
-			knot.addTanTarget();
-			this.mode = "creating";
+			if (ty === "corner") {
+				knot.addTanTarget();
+				this.mode = "creating";
+			} else {
+				this.mode = "dragging";
+			}
 			this.initPt = pt;
 		} else if (obj instanceof TanHandle) {
 			obj.knot.removeTanHandle();
@@ -150,6 +163,53 @@ class SplineEdit {
 		this.mode = "start";
 	}
 
+	onPointerHover(ev) {
+		let pt = this.ui.getCoords(ev);
+		// TODO: hover the knots and the visible tangent handles
+		let hit = this.bezpath.hitTest(pt.x, pt.y);
+		// TODO: display proposed knot
+	}
+
+	onKeyDown(ev) {
+		if (ev.key === "Backspace" || ev.key === "Delete") {
+			for (let i = 0; i < this.knots.length; i++) {
+				let knot = this.knots[i];
+				if (this.selection.has(knot)) {
+					this.knots.splice(i, 1);
+					knot.handleEl.remove();
+					i--;
+				}
+			}
+			this.selection = new Set();
+			this.render();
+			return true;
+		} else if (ev.key === "ArrowLeft") {
+			this.nudge(-1, 0, ev);
+			return true;
+		} else if (ev.key === "ArrowRight") {
+			this.nudge(1, 0, ev);
+			return true;
+		} else if (ev.key === "ArrowUp") {
+			this.nudge(0, -1, ev);
+			return true;
+		} else if (ev.key === "ArrowDown") {
+			this.nudge(0, 1, ev);
+			return true;
+		}
+		return false;
+	}
+
+	nudge(dx, dy, ev) {
+		if (ev && ev.shiftKey) {
+			dx *= 10;
+			dy *= 10;
+		}
+		for (let knot of this.selection) {
+			knot.updatePos(knot.x + dx, knot.y + dy);
+		}
+		this.render();
+	}
+
 	render() {
 		let ctrlPts = [];
 		for (let knot of this.knots) {
@@ -160,7 +220,8 @@ class SplineEdit {
 		spline.solve();
 		// Should this be bundled into solve?
 		spline.computeCurvatureBlending();
-		let path = spline.renderSvg();
+		this.bezpath = spline.render();
+		let path = this.bezpath.renderSvg();
 		document.getElementById("spline").setAttribute("d", path);
 	}
 }
@@ -313,20 +374,39 @@ class Ui {
 	setupHandlers() {
 		let svg = document.getElementById("s");
 
-		svg.addEventListener("pointermove", e => this.pointerMove(e));
-		svg.addEventListener("pointerup", e => this.pointerUp(e));
-		svg.addEventListener("pointerdown", e => this.pointerDown(e));
+		if ("PointerEvent" in window) {
+			svg.addEventListener("pointermove", e => this.pointerMove(e));
+			svg.addEventListener("pointerup", e => this.pointerUp(e));
+			svg.addEventListener("pointerdown", e => this.pointerDown(e));
+		} else {
+			// Fallback for ancient browsers
+			svg.addEventListener("mousemove", e => this.mouseMove(e));
+			svg.addEventListener("mouseup", e => this.mouseUp(e));
+			svg.addEventListener("mousedown", e => this.mouseDown(e));
+			// TODO: add touch handlers
+		}
+		window.addEventListener("keydown", e => this.keyDown(e));
 		this.mousehandler = null;
 		this.receiver = null;
 	}
 
 	attachHandler(element, handler) {
 		let svg = document.getElementById("s");
-		element.addEventListener("pointerdown", e => {
-			svg.setPointerCapture(e.pointerId);
-			this.mousehandler = handler;
-			e.stopPropagation();
-		});
+		if ("PointerEvent" in window) {
+			element.addEventListener("pointerdown", e => {
+				svg.setPointerCapture(e.pointerId);
+				this.mousehandler = handler;
+				e.preventDefault();
+				e.stopPropagation();
+			});
+		} else {
+			element.addEventListener("mousedown", e => {
+				this.mousehandler = handler;
+				e.preventDefault();
+				e.stopPropagation();
+			});
+			// TODO: add touch handlers
+		}
 	}
 
 	/// This is the pattern for the new object-y style.
@@ -334,22 +414,39 @@ class Ui {
 	// Maybe just rely on closures to capture obj?
 	attachReceiver(element, receiver, obj) {
 		let svg = document.getElementById("s");
-		element.addEventListener("pointerdown", e => {
-			this.gestureDet.onPointerDown(e);
-			svg.setPointerCapture(e.pointerId);
-			this.receiver = receiver;
-			receiver.onPointerDown(e, obj);
-			e.stopPropagation();
-		});
+		if ("PointerEvent" in window) {
+			element.addEventListener("pointerdown", e => {
+				this.gestureDet.onPointerDown(e);
+				svg.setPointerCapture(e.pointerId);
+				this.receiver = receiver;
+				receiver.onPointerDown(e, obj);
+				e.stopPropagation();
+			});
+		} else {
+			element.addEventListener("mousedown", e => {
+				this.gestureDet.onPointerDown(e);
+				this.receiver = receiver;
+				receiver.onPointerDown(e, obj);
+				e.stopPropagation();
+			});
+			// TODO: add touch handlers
+		}
+	}
+
+	pointerDownCommon(e) {
+		this.gestureDet.onPointerDown(e);
+		this.se.onPointerDown(e, null);
+		e.preventDefault();
 	}
 
 	pointerDown(e) {
-		this.gestureDet.onPointerDown(e);
 		let svg = document.getElementById("s");
 		svg.setPointerCapture(e.pointerId);
-		this.se.onPointerDown(e, null);
-		//this.addPoint(e.offsetX, e.offsetY);
-		//this.redraw();
+		this.pointerDownCommon(e);
+	}
+
+	mouseDown(e) {
+		this.pointerDownCommon(e);
 	}
 
 	pointerMove(e) {
@@ -357,16 +454,39 @@ class Ui {
 			this.receiver.onPointerMove(e);
 		} else if (this.mousehandler !== null) {
 			this.mousehandler(e);
+		} else {
+			this.se.onPointerHover(e);
 		}
+		e.preventDefault();
 	}
 
-	pointerUp(e) {
+	mouseMove(e) {
+		this.pointerMove(e);
+	}
+
+	pointerUpCommon(e) {
 		if (this.receiver !== null) {
 			this.receiver.onPointerUp(e);
 		}
-		e.target.releasePointerCapture(e.pointerId);
 		this.mousehandler = null;
 		this.receiver = null;
+		e.preventDefault();
+	}
+
+	pointerUp(e) {
+		e.target.releasePointerCapture(e.pointerId);
+		this.pointerUpCommon(e);
+	}
+
+	mouseUp(e) {
+		this.pointerUpCommon(e);
+	}
+
+	keyDown(e) {
+		let handled = this.se.onKeyDown(e);
+		if (handled) {
+			e.preventDefault();
+		}
 	}
 
 	// On Chrome, just offsetX, offsetY work, but on FF it takes the group transforms

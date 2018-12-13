@@ -630,15 +630,16 @@ class Spline {
 		}
 	}
 
-	renderSvg() {
+	render() {
+		let path = new BezPath;
 		if (this.ctrlPts.length == 0) {
-			return "";
+			return path;
 		}
 		let pt0 = this.ctrlPts[0];
-		let path = `M${pt0.pt.x} ${pt0.pt.y}`;
+		path.moveto(pt0.pt.x, pt0.pt.y);
 		let i = 0;
-		let cmd = " C";
 		for (let i = 0; i + 1 < this.ctrlPts.length; i++) {
+			path.mark(i);
 			let ptI = this.ctrlPts[i];
 			let ptI1 = this.ctrlPts[i + 1];
 			let dx = ptI1.pt.x - ptI.pt.x;
@@ -652,16 +653,23 @@ class Spline {
 			let k1 = ptI1.kBlend !== null ? ptI1.kBlend * chord : null;
 			//console.log(`segment ${i}: ${k0} ${k1}`);
 			let render = this.curve.render4(th0, th1, k0, k1);
+			let c = [];
 			for (let j = 0; j < render.length; j++) {
 				let pt = render[j];
-				let x = ptI.pt.x + dx * pt.x - dy * pt.y;
-				let y = ptI.pt.y + dy * pt.x + dx * pt.y;
-				path += `${cmd}${x} ${y}`;
-				cmd = " ";
+				c.push(ptI.pt.x + dx * pt.x - dy * pt.y);
+				c.push(ptI.pt.y + dy * pt.x + dx * pt.y);
 			}
-			path += ` ${ptI1.pt.x} ${ptI1.pt.y}`;
+			c.push(ptI1.pt.x);
+			c.push(ptI1.pt.y);
+			for (let j = 0; j < c.length; j += 6) {
+				path.curveto(c[j], c[j + 1], c[j + 2], c[j + 3], c[j + 4], c[j + 5]);
+			}
 		}
 		return path;
+	}
+
+	renderSvg() {
+		return this.render().renderSvg();
 	}
 }
 
