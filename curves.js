@@ -623,7 +623,7 @@ class Spline {
 				} else {
 					let rK = Math.tan(pt.rAk) / this.chordLen(i - 1);
 					let lK = Math.tan(pt.lAk) / this.chordLen(i);
-					pt.kBlend = 1 / (1 / rK + 1 / lK);
+					pt.kBlend = 2 / (1 / rK + 1 / lK);
 					//console.log(`point ${i}: kBlend = ${pt.kBlend}`);
 				}
 			}
