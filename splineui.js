@@ -158,6 +158,8 @@ class SplineEdit {
 		}
 		let spline = new Spline(ctrlPts);
 		spline.solve();
+		// Should this be bundled into solve?
+		spline.computeCurvatureBlending();
 		let path = spline.renderSvg();
 		document.getElementById("spline").setAttribute("d", path);
 	}

@@ -72,6 +72,33 @@ class CubicBez {
 		let d2 = this.deriv2(t);
 		return Math.atan2(d.cross(d2), Math.pow(d.norm(), 3));
 	}
+
+	// de Casteljau's algorithm
+	leftHalf() {
+		let c = new Float64Array(8);
+		c[0] = this.c[0];
+		c[1] = this.c[1];
+		c[2] = 0.5 * (this.c[0] + this.c[2]);
+		c[3] = 0.5 * (this.c[1] + this.c[3]);
+		c[4] = 0.25 * (this.c[0] + 2 * this.c[2] + this.c[4]);
+		c[5] = 0.25 * (this.c[1] + 2 * this.c[3] + this.c[5]);
+		c[6] = 0.125 * (this.c[0] + 3 * (this.c[2] + this.c[4]) + this.c[6]);
+		c[7] = 0.125 * (this.c[1] + 3 * (this.c[3] + this.c[5]) + this.c[7]);
+		return new CubicBez(c);
+	}
+
+	rightHalf() {
+		let c = new Float64Array(8);
+		c[0] = 0.125 * (this.c[0] + 3 * (this.c[2] + this.c[4]) + this.c[6]);
+		c[1] = 0.125 * (this.c[1] + 3 * (this.c[3] + this.c[5]) + this.c[7]);
+		c[2] = 0.25 * (this.c[2] + 2 * this.c[4] + this.c[6]);
+		c[3] = 0.25 * (this.c[3] + 2 * this.c[5] + this.c[7]);
+		c[4] = 0.5 * (this.c[4] + this.c[6]);
+		c[5] = 0.5 * (this.c[5] + this.c[7]);
+		c[6] = this.c[6];
+		c[7] = this.c[7];
+		return new CubicBez(c);
+	}
 }
 
 function testCubicBez() {
@@ -91,6 +118,39 @@ function testCubicBez() {
 	let dxy1 = cb.deriv(t + epsilon);
 	console.log(new Vec2((dxy1.x - dxy0.x) / epsilon, (dxy1.y - dxy0.y) / epsilon));
 	console.log(cb.deriv2(t));
+}
+
+class Polynomial {
+	constructor(c) {
+		this.c = c;
+	}
+
+	eval(x) {
+		let xi = 1;
+		let s = 0;
+		for (let a of this.c) {
+			s += a * xi;
+			xi *= x;
+		}
+		return s;
+	}
+
+	deriv() {
+		let c = new Float64Array(this.c.length - 1);
+		for (let i = 0; i < c.length; i++) {
+			c[i] = (i + 1) * this.c[i + 1];
+		}
+		return new Polynomial(c);
+	}
+}
+
+function hermite5(x0, x1, v0, v1, a0, a1) {
+	return new Polynomial([x0,
+		v0,
+		0.5 * a0,
+		-10 * x0 + 10 * x1 - 6 * v0 - 4 * v1 - 1.5 * a0 + 0.5 * a1,
+		15 * x0 - 15 * x1 + 8 * v0 + 7 * v1 + 1.5 * a0 - a1,
+		-6 * x0 + 6 * x1 - 3 * v0 - 3 * v1 + -.5 * a0 + 0.5 * a1]);
 }
 
 /// Solve tridiagonal matrix system. Destroys inputs, leaves output in x.
@@ -215,6 +275,60 @@ class MyCurve extends TwoParamCurve {
 	render(th0, th1) {
 		let c = myCubic(th0, th1);
 		return [new Vec2(c[2], c[3]), new Vec2(c[4], c[5])];
+	}
+
+	/// Render as a 4-parameter curve with optional adjusted endpoint curvatures.
+	render4(th0, th1, k0, k1) {
+		if (k0 === null && k1 === null) {
+			return this.render(th0, th1);
+		}
+		let cb = new CubicBez(myCubic(th0, th1));
+		// compute second deriv tweak to match curvature
+		function curvAdjust(t, th, k) {
+			if (k === null) return new Vec2(0, 0);
+			let c = Math.cos(th);
+			let s = Math.sin(th);
+			let d2 = cb.deriv2(t);
+			let d2cross = d2.y * c - d2.x * s;
+			let d = cb.deriv(t);
+			let ddot = d.x * c + d.y * s;
+			// TODO: if ddot = 0, cusp, no adjustment
+			let oldK = d2cross / (ddot * ddot);
+			let kAdjust = k - oldK;
+			let aAdjust = kAdjust * (ddot * ddot);
+			return new Vec2(-s * aAdjust, c * aAdjust);
+		}
+		let a0 = curvAdjust(0, th0, k0);
+		let a1 = curvAdjust(1, -th1, k1);
+		let hx = hermite5(0, 0, 0, 0, a0.x, a1.x);
+		let hy = hermite5(0, 0, 0, 0, a0.y, a1.y);
+		let hxd = hx.deriv();
+		let hyd = hy.deriv();
+		// This really would be cleaner if we had arbitrary deCasteljau...
+		let c0 = cb.leftHalf();
+		let c1 = cb.rightHalf();
+		let cs = [c0.leftHalf(), c0.rightHalf(), c1.leftHalf(), c1.rightHalf()];
+		let result = [];
+		let scale = 1./12;
+		for (let i = 0; i < 4; i++) {
+			let t = 0.25 * i;
+			let t1 = t + 0.25;
+			let c = cs[i].c;
+			let x0 = hx.eval(t);
+			let y0 = hy.eval(t);
+			let x1 = x0 + scale * hxd.eval(t);
+			let y1 = y0 + scale * hyd.eval(t);
+			let x3 = hx.eval(t1);
+			let y3 = hy.eval(t1);
+			let x2 = x3 - scale * hxd.eval(t1);
+			let y2 = y3 - scale * hyd.eval(t1);
+			if (i != 0) {
+				result.push(new Vec2(c[0] + x0, c[1] + y0));
+			}
+			result.push(new Vec2(c[2] + x1, c[3] + y1));
+			result.push(new Vec2(c[4] + x2, c[5] + y2));
+		}
+		return result;
 	}
 
 	computeCurvature(th0, th1) {
@@ -472,9 +586,46 @@ class Spline {
 				for (let k = i; k + 1 < j; k++) {
 					this.ctrlPts[k].rTh = inner.ths[k - i];
 					this.ctrlPts[k + 1].lTh = inner.ths[k + 1 - i];
+					// Record curvatures (for blending, not all will be used)
+					let ths = inner.getThs(k - i);
+					let aks = this.curve.computeCurvature(ths.th0, ths.th1);
+					this.ctrlPts[k].rAk = aks.ak0;
+					this.ctrlPts[k + 1].lAk = aks.ak1;
 				}
 
 				i = j - 1;
+			}
+		}
+	}
+
+	chordLen(i) {
+		let ptI = this.ctrlPts[i].pt;
+		let ptI1 = this.ctrlPts[i + 1].pt;
+		return Math.hypot(ptI1.x - ptI.x, ptI1.y - ptI.y);
+	}
+
+	// Determine whether a control point requires curvature blending, and if so,
+	// the blended curvature. To be invoked after solving.
+	computeCurvatureBlending() {
+		for (let pt of this.ctrlPts) {
+			pt.kBlend = null;
+		}
+		for (let i = 1; i < this.ctrlPts.length - 1; i++) {
+			let pt = this.ctrlPts[i];
+			if (pt.ty === "smooth" && pt.th !== null) {
+				let thresh = Math.PI / 2 - 1e-6;
+				if (Math.abs(pt.rAk) > thresh || Math.abs(pt.lAk) > thresh) {
+					// Don't blend reversals. We might reconsider this, but punt for now.
+					continue;
+				}
+				if (Math.sign(pt.rAk) != Math.sign(pt.lAk)) {
+					pt.kBlend = 0;
+				} else {
+					let rK = Math.tan(pt.rAk) / this.chordLen(i - 1);
+					let lK = Math.tan(pt.lAk) / this.chordLen(i);
+					pt.kBlend = 1 / (1 / rK + 1 / lK);
+					//console.log(`point ${i}: kBlend = ${pt.kBlend}`);
+				}
 			}
 		}
 	}
@@ -493,9 +644,14 @@ class Spline {
 			let dx = ptI1.pt.x - ptI.pt.x;
 			let dy = ptI1.pt.y - ptI.pt.y;
 			let chth = Math.atan2(dy, dx);
+			let chord = Math.hypot(dy, dx);
 			let th0 = mod2pi(ptI.rTh - chth);
 			let th1 = mod2pi(chth - ptI1.lTh);
-			let render = this.curve.render(th0, th1);
+			// Apply curvature blending
+			let k0 = ptI.kBlend !== null ? ptI.kBlend * chord : null;
+			let k1 = ptI1.kBlend !== null ? ptI1.kBlend * chord : null;
+			//console.log(`segment ${i}: ${k0} ${k1}`);
+			let render = this.curve.render4(th0, th1, k0, k1);
 			for (let j = 0; j < render.length; j++) {
 				let pt = render[j];
 				let x = ptI.pt.x + dx * pt.x - dy * pt.y;
