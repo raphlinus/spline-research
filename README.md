@@ -26,7 +26,9 @@ motivation), vector illustration in general, CAD, and other applications
 such as maps and representation of path centerlines for autonomous
 vehicles.
 
-TODO: link paper PDF and online demo.
+Try the [online demo](https://spline.technology/demo).
+
+Read more about the spline in [research paper 1](https://spline.technology/paper1.pdf).
 
 ## License and patent grant
 
