@@ -549,7 +549,8 @@ class Spline {
 	}
 
 	pt(i, start) {
-		return this.ctrlPts[(i + start) % this.ctrlPts.length];
+		let length = this.ctrlPts.length;
+		return this.ctrlPts[(i + start + length) % length];
 	}
 
 	startIx() {
@@ -618,8 +619,8 @@ class Spline {
 	}
 
 	chordLen(i) {
-		let ptI = this.ctrlPts[i].pt;
-		let ptI1 = this.ctrlPts[i + 1].pt;
+		let ptI = this.pt(i, 0).pt;
+		let ptI1 = this.pt(i + 1, 0).pt;
 		return Math.hypot(ptI1.x - ptI.x, ptI1.y - ptI.y);
 	}
 
@@ -629,8 +630,9 @@ class Spline {
 		for (let pt of this.ctrlPts) {
 			pt.kBlend = null;
 		}
-		for (let i = 1; i < this.ctrlPts.length - 1; i++) {
-			let pt = this.ctrlPts[i];
+		let length = this.ctrlPts.length - (this.isClosed ? 0 : 1);
+		for (let i = 0; i < length; i++) {
+			let pt = this.pt(i, 0);
 			if (pt.ty === "smooth" && pt.th !== null) {
 				let thresh = Math.PI / 2 - 1e-6;
 				if (Math.abs(pt.rAk) > thresh || Math.abs(pt.lAk) > thresh) {
