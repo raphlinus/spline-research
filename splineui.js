@@ -37,6 +37,7 @@ class SplineEdit {
 	constructor(ui) {
 		this.ui = ui;
 		this.knots = [];
+		this.isClosed = false;
 		this.bezpath = new BezPath;
 		this.selection = new Set();
 		this.mode = "start";
@@ -95,6 +96,13 @@ class SplineEdit {
 			obj.knot.addTanTarget();
 			obj.knot.setTan(obj.knot.th, tanR3);
 		} else {
+			if (this.selection.size == 1
+				&& this.selection.has(this.knots[this.knots.length - 1])
+				&& this.knots.length >= 3
+				&& obj === this.knots[0])
+			{
+				this.isClosed = true;
+			}
 			this.mode = "dragging";
 			if (this.ui.gestureDet.clickCount > 1) {
 				if (obj.ty === "corner") {
@@ -180,6 +188,9 @@ class SplineEdit {
 					i--;
 				}
 			}
+			if (this.knots.length < 3) {
+				this.isClosed = false;
+			}
 			this.selection = new Set();
 			this.render();
 			return true;
@@ -216,7 +227,7 @@ class SplineEdit {
 			let pt = new ControlPoint(new Vec2(knot.x, knot.y), knot.ty, knot.th);
 			ctrlPts.push(pt);
 		}
-		let spline = new Spline(ctrlPts);
+		let spline = new Spline(ctrlPts, this.isClosed);
 		spline.solve();
 		// Should this be bundled into solve?
 		spline.computeCurvatureBlending();

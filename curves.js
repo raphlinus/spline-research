@@ -548,13 +548,32 @@ class Spline {
 		this.curve = new MyCurve();
 	}
 
+	pt(i, start) {
+		return this.ctrlPts[(i + start) % this.ctrlPts.length];
+	}
+
+	startIx() {
+		if (!this.isClosed) {
+			return 0;
+		}
+		for (let i = 0; i < this.ctrlPts.length; i++) {
+			let pt = this.ctrlPts[i];
+			if (pt.ty === "corner" || pt.th !== null) {
+				return i;
+			}
+		}
+		// Path is all-smooth and closed.
+		return 0;
+	}
+
 	solve() {
-		var i = 0;
-		while (i + 1 < this.ctrlPts.length) {
-			let ptI = this.ctrlPts[i];
-			let ptI1 = this.ctrlPts[i + 1];
-			// Assume point i is a corner point (this will change when we have closed paths).
-			if ((i + 2 == this.ctrlPts.length || ptI1.ty === "corner")
+		let start = this.startIx();
+		let length = this.ctrlPts.length - (this.isClosed ? 0 : 1);
+		let i = 0;
+		while (i < length) {
+			let ptI = this.pt(i, start);
+			let ptI1 = this.pt(i + 1, start);
+			if ((i + 1 == length || ptI1.ty === "corner")
 				&& ptI.th === null && ptI1.th === null) {
 				let dx = ptI1.pt.x - ptI.pt.x;
 				let dy = ptI1.pt.y - ptI.pt.y;
@@ -566,8 +585,8 @@ class Spline {
 				// We have a curve.
 				let innerPts = [ptI.pt];
 				let j = i + 1;
-				while (j < this.ctrlPts.length) {
-					let ptJ = this.ctrlPts[j];
+				while (j < length + 1) {
+					let ptJ = this.pt(j, start);
 					innerPts.push(ptJ.pt);
 					j += 1;
 					if (ptJ.ty === "corner" || ptJ.th !== null) {
@@ -576,21 +595,21 @@ class Spline {
 				}
 				//console.log(innerPts);
 				let inner = new TwoParamSpline(this.curve, innerPts);
-				inner.startTh = this.ctrlPts[i].th;
-				inner.endTh = this.ctrlPts[j - 1].th;
+				inner.startTh = this.pt(i, start).th;
+				inner.endTh = this.pt(j - 1, start).th;
 				let nIter = 10;
 				inner.initialThs();
 				for (let k = 0; k < nIter; k++) {
 					inner.iterDumb(k);
 				}
 				for (let k = i; k + 1 < j; k++) {
-					this.ctrlPts[k].rTh = inner.ths[k - i];
-					this.ctrlPts[k + 1].lTh = inner.ths[k + 1 - i];
+					this.pt(k, start).rTh = inner.ths[k - i];
+					this.pt(k + 1, start).lTh = inner.ths[k + 1 - i];
 					// Record curvatures (for blending, not all will be used)
 					let ths = inner.getThs(k - i);
 					let aks = this.curve.computeCurvature(ths.th0, ths.th1);
-					this.ctrlPts[k].rAk = aks.ak0;
-					this.ctrlPts[k + 1].lAk = aks.ak1;
+					this.pt(k, start).rAk = aks.ak0;
+					this.pt(k + 1, start).lAk = aks.ak1;
 				}
 
 				i = j - 1;
@@ -637,11 +656,12 @@ class Spline {
 		}
 		let pt0 = this.ctrlPts[0];
 		path.moveto(pt0.pt.x, pt0.pt.y);
+		let length = this.ctrlPts.length - (this.isClosed ? 0 : 1);
 		let i = 0;
-		for (let i = 0; i + 1 < this.ctrlPts.length; i++) {
+		for (let i = 0; i < length; i++) {
 			path.mark(i);
-			let ptI = this.ctrlPts[i];
-			let ptI1 = this.ctrlPts[i + 1];
+			let ptI = this.pt(i, 0);
+			let ptI1 = this.pt(i + 1, 0);
 			let dx = ptI1.pt.x - ptI.pt.x;
 			let dy = ptI1.pt.y - ptI.pt.y;
 			let chth = Math.atan2(dy, dx);
@@ -664,6 +684,9 @@ class Spline {
 			for (let j = 0; j < c.length; j += 6) {
 				path.curveto(c[j], c[j + 1], c[j + 2], c[j + 3], c[j + 4], c[j + 5]);
 			}
+		}
+		if (this.isClosed) {
+			path.closepath();
 		}
 		return path;
 	}
