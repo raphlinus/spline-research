@@ -41,9 +41,12 @@ class GestureDet {
 }
 
 // Dimensions of the tangent target
+// Inside this radius, convert to corner point
 let tanR1 = 5;
+// Radius of drawn tangent marker
 let tanR2 = 15;
-let tanR3 = 20;
+// Outside this radius, remove explicit tangent
+let tanR3 = 45;
 
 /// State and UI for an editable spline
 class SplineEdit {
@@ -54,25 +57,9 @@ class SplineEdit {
 		this.bezpath = new BezPath;
 		this.selection = new Set();
 		this.mode = "start";
-		this.toSmooth = false;
 	}
 
 	setSelection(sel) {
-		for (let obj of this.selection) {
-			if (!sel.has(obj)) {
-				obj.handleEl.classList.remove("selected");
-				obj.removeTanTarget();
-				obj.removeTanHandle();
-			}
-		}
-		for (let obj of sel) {
-			if (!this.selection.has(obj)) {
-				obj.handleEl.classList.add("selected");
-				if (this.mode === "dragging") {
-					obj.addTanHandle();
-				}
-			}
-		}
 		this.selection = sel;
 	}
 
@@ -94,20 +81,21 @@ class SplineEdit {
 			this.ui.receiver = this;
 			this.setSelection(new Set([knot]));
 			if (ty === "corner") {
-				knot.addTanTarget();
 				this.mode = "creating";
 			} else {
 				this.mode = "dragging";
 			}
 			this.initPt = pt;
 		} else if (obj instanceof TanHandle) {
-			obj.knot.removeTanHandle();
 			this.mode = "tanhandle";
 			// This suggests maybe we should use selected point, not initPt
 			this.initPt = new Vec2(obj.knot.x, obj.knot.y);
+			let th = Math.atan2(pt.y - this.initPt.y, pt.x - this.initPt.x);
+			if (ev.shiftKey) {
+				th = Math.PI / 2 * Math.round(th * (2 / Math.PI));
+			}
+			obj.knot.setTan(th);
 			this.setSelection(new Set([obj.knot]));
-			obj.knot.addTanTarget();
-			obj.knot.setTan(obj.knot.th, tanR3);
 		} else {
 			if (this.selection.size == 1
 				&& this.selection.has(this.knots[this.knots.length - 1])
@@ -119,15 +107,11 @@ class SplineEdit {
 			this.mode = "dragging";
 			if (this.ui.gestureDet.clickCount > 1) {
 				if (obj.ty === "corner") {
-					this.initPt = new Vec2(obj.x, obj.y);
-					this.mode = "tanhandle";
-					obj.addTanTarget();
-					this.toSmooth = true;
+					obj.setTy("smooth");
 				} else {
 					obj.setTy("corner");
-					obj.removeTanHandle();
-					obj.setTan(null);
 				}
+				obj.setTan(null);
 			}
 			let sel = new Set([obj]);
 			if (this.mode === "dragging" && (ev.shiftKey || this.selection.has(obj))) {
@@ -149,20 +133,25 @@ class SplineEdit {
 			for (let knot of this.selection) {
 				knot.updatePos(knot.x + dx, knot.y + dy);
 			}
-		} else if (this.mode === "creating" || this.mode === "tanhandle") {
+		} else if (this.mode === "creating") {
 			let r = Math.hypot(pt.x - this.initPt.x, pt.y - this.initPt.y);
 			let ty = r < tanR1 ? "corner" : "smooth";
-			let  th = null;
-			if (r >= tanR1 && r < 2 * tanR3 - tanR2) {
-				this.toSmooth = false;
+			for (let knot of this.selection) {
+				knot.setTy(ty);
+			}
+		} else if (this.mode === "tanhandle") {
+			let r = Math.hypot(pt.x - this.initPt.x, pt.y - this.initPt.y);
+			let ty = r < tanR1 ? "corner" : "smooth";
+			let th = null;
+			if (r >= tanR1 && r < tanR3) {
 				th = Math.atan2(pt.y - this.initPt.y, pt.x - this.initPt.x);
-				if (r < tanR2) {
+				if (ev.shiftKey) {
 					th = Math.PI / 2 * Math.round(th * (2 / Math.PI));
 				}
 			}
 			for (let knot of this.selection) {
 				knot.setTy(ty);
-				knot.setTan(th, tanR3);
+				knot.setTan(th);
 			}
 		}
 		this.render();
@@ -170,18 +159,8 @@ class SplineEdit {
 	}
 
 	onPointerUp(ev) {
-		for (let knot of this.selection) {
-			if (this.toSmooth) {
-				knot.setTy("smooth");
-				this.toSmooth = false;
-				this.render();
-			}
-			knot.removeTanTarget();
-			if (this.mode === "creating" || this.mode === "tanhandle") {
-				knot.addTanHandle();
-			}
-		}
 		this.mode = "start";
+		this.render();
 	}
 
 	onPointerHover(ev) {
@@ -234,19 +213,33 @@ class SplineEdit {
 		this.render();
 	}
 
-	render() {
+	renderSpline() {
 		let ctrlPts = [];
 		for (let knot of this.knots) {
 			let pt = new ControlPoint(new Vec2(knot.x, knot.y), knot.ty, knot.th);
 			ctrlPts.push(pt);
 		}
-		let spline = new Spline(ctrlPts, this.isClosed);
-		spline.solve();
+		this.spline = new Spline(ctrlPts, this.isClosed);
+		this.spline.solve();
 		// Should this be bundled into solve?
-		spline.computeCurvatureBlending();
-		this.bezpath = spline.render();
+		this.spline.computeCurvatureBlending();
+		this.bezpath = this.spline.render();
 		let path = this.bezpath.renderSvg();
 		document.getElementById("spline").setAttribute("d", path);
+	}
+
+	renderSel() {
+		for (let i = 0; i < this.knots.length; i++) {
+			let knot = this.knots[i];
+			knot.computedLTh = this.spline.pt(i, 0).lTh;
+			knot.computedRTh = this.spline.pt(i, 0).rTh;
+			knot.updateSelDecoration(this.selection.has(knot), this.mode);
+		}
+	}
+
+	render() {
+		this.renderSpline();
+		this.renderSel();
 	}
 }
 
@@ -258,6 +251,11 @@ class Knot {
 		this.y = y;
 		this.ty = ty;
 		this.th = null;
+		this.selected = false;
+		this.lthLine = null;
+		this.rthLine = null;
+		this.lthCircle = null;
+		this.rthCircle = null;
 
 		this.handleEl = this.createHandleEl();
 	}
@@ -292,76 +290,116 @@ class Knot {
 		return inner;			
 	}
 
-	addTanTarget() {
-		for (let i = 0; i < 4; i++) {
-			let th = i * (Math.PI / 2);
-			let s = Math.sin(th);
-			let c = Math.cos(th);
-			let line = this.se.ui.createSvgElement("line");
-			line.setAttribute("x1", tanR1 * c);
-			line.setAttribute("y1", tanR1 * s);
-			line.setAttribute("x2", tanR2 * c);
-			line.setAttribute("y2", tanR2 * s);
-			line.setAttribute("class", "target");
-			this.handleEl.appendChild(line);
-
-		}
-		let circle = this.se.ui.createSvgElement("circle");
-		circle.setAttribute("cx", 0);
-		circle.setAttribute("cy", 0);
-		circle.setAttribute("r", tanR3);
-		circle.setAttribute("class", "target");
-		this.handleEl.appendChild(circle);
-	}
-
-	removeTanTarget() {
-		for (let child of this.handleEl.querySelectorAll(".target")) {
-			this.handleEl.removeChild(child);
-		}
-	}
-
-	setTan(th, r) {
-		for (let child of this.handleEl.querySelectorAll(".tan")) {
-			this.handleEl.removeChild(child);
-		}
-		if (th !== null) {
-			let line = this.se.ui.createSvgElement("line");
-			line.setAttribute("x1", -r * Math.cos(th));
-			line.setAttribute("y1", -r * Math.sin(th));
-			line.setAttribute("x2", r * Math.cos(th));
-			line.setAttribute("y2", r * Math.sin(th));
-			line.setAttribute("class", "tan");
-			this.handleEl.appendChild(line);
-		}
+	setTan(th) {
 		this.th = th;
 	}
 
-	addTanHandle() {
-		let th = this.th;
-		if (th !== null) {
-			this.setTan(th, tanR2);
-			let circle = this.se.ui.createSvgElement("circle", true);
-			circle.setAttribute("cx", tanR2 * Math.cos(this.th));
-			circle.setAttribute("cy", tanR2 * Math.sin(th));
-			circle.setAttribute("r", 3);
-			circle.setAttribute("class", "tanhandle");
-			this.handleEl.appendChild(circle);
-			let tanHandle = new TanHandle(this);
-			// To be more object oriented, receiver might be the knot or tanHandle. Ah well.
-			this.se.ui.attachReceiver(circle, this.se, tanHandle);
+	addSelDecoration() {
+		let lTh = this.th;
+		let rTh = this.th;
+		if (lTh === null && this.computedLTh !== undefined) lTh = this.computedLTh;
+		if (rTh === null && this.computedRTh !== undefined) rTh = this.computedRTh;
+		this.drawTan(lTh, rTh, tanR2);
+		for (let i = 0; i < 2; i++) {
+			let th = i == 0 ? lTh : rTh;
+			if (th !== null) {
+				let circle = this.se.ui.createSvgElement("circle", true);
+				let scale = i == 0 ? -tanR2 : tanR2;
+				circle.setAttribute("cx", scale * Math.cos(th));
+				circle.setAttribute("cy", scale * Math.sin(th));
+				circle.setAttribute("r", 3);
+				circle.setAttribute("class", "tanhandle");
+				if (this.th === null) {
+					circle.classList.add("computed");
+				}
+				this.handleEl.appendChild(circle);
+				let tanHandle = new TanHandle(this, i != 0);
+				// To be more object oriented, receiver might be the knot or tanHandle. Ah well.
+				this.se.ui.attachReceiver(circle, this.se, tanHandle);
+			}
 		}
 	}
 
-	removeTanHandle() {
+	removeSelDecoration() {
 		// Maybe DRY?
 		for (let child of this.handleEl.querySelectorAll(".tanhandle")) {
 			this.handleEl.removeChild(child);
 		}
 	}
 
-	toggleTy() {
-		let ty = this.ty === "corner" ? "smooth" : "corner";
-		this.setTy(ty);
+	updateSelLine(th, el, r) {
+		if (th === null && el !== null) {
+			el.remove();
+			el = null;
+		} else if (th !== null && el === null) {
+			el = this.se.ui.createSvgElement("line");
+			el.setAttribute("x1", 0);
+			el.setAttribute("y1", 0);
+			el.setAttribute("class", "tan");
+			this.handleEl.appendChild(el);
+		}
+		if (el !== null) {
+			el.setAttribute("x2", r * Math.cos(th));
+			el.setAttribute("y2", r * Math.sin(th));
+		}
+		return el;
+	}
+
+	updateSelCircle(th, el, r, computed) {
+		if (th === null && el !== null) {
+			el.remove();
+			el = null;
+		} else if (th !== null && el === null) {
+			el = this.se.ui.createSvgElement("circle", true);
+			el.setAttribute("r", 3);
+			el.setAttribute("class", "tanhandle");
+			this.handleEl.appendChild(el);
+			let tanHandle = new TanHandle(this, r > 0);
+			// To be more object oriented, receiver might be the knot or tanHandle. Ah well.
+			this.se.ui.attachReceiver(el, this.se, tanHandle);
+		}
+		if (el !== null) {
+			if (computed) {
+				el.classList.add("computed");
+			} else {
+				el.classList.remove("computed");
+			}
+			el.setAttribute("cx", r * Math.cos(th));
+			el.setAttribute("cy", r * Math.sin(th));
+		}
+		return el;
+	}
+
+	updateSelDecoration(selected, mode) {
+		if (!selected && this.selected) {
+			this.handleEl.classList.remove("selected");
+		} else if (selected && !this.selected) {
+			this.handleEl.classList.add("selected");
+		}
+		let computed = this.th === null;
+		let drawCirc = selected && (mode !== "creating" && mode !== "dragging");
+		let drawTan = !computed || drawCirc;
+		let lth = null;
+		if (drawTan && this.th != null) {
+			lth = this.th;
+		} else if (drawTan && this.computedLTh !== undefined) {
+			lth = this.computedLTh;
+		}
+		let rth = null;
+		if (drawTan && this.th != null) {
+			rth = this.th;
+		} else if (drawTan && this.computedRTh !== undefined) {
+			rth = this.computedRTh;
+		}
+		this.rthLine = this.updateSelLine(rth, this.rthLine, tanR2 - 3);
+		this.lthLine = this.updateSelLine(lth, this.lthLine, -tanR2 + 3);
+		if (!drawCirc) {
+			lth = null;
+			rth = null;
+		}
+		this.lthCircle = this.updateSelCircle(lth, this.lthCircle, -tanR2, computed);
+		this.rthCircle = this.updateSelCircle(rth, this.rthCircle, tanR2, computed);
+		this.selected = selected;
 	}
 
 	setTy(ty) {
@@ -380,8 +418,9 @@ class Knot {
 }
 
 class TanHandle {
-	constructor(knot) {
+	constructor(knot, isRight) {
 		this.knot = knot;
+		this.isRight = isRight;
 	}
 }
 
