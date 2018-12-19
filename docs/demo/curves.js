@@ -588,7 +588,7 @@ class Spline {
 			let ptI = this.pt(i, start);
 			let ptI1 = this.pt(i + 1, start);
 			if ((i + 1 == length || ptI1.ty === "corner")
-				&& ptI.th === null && ptI1.th === null) {
+				&& ptI.rth === null && ptI1.lth === null) {
 				let dx = ptI1.pt.x - ptI.pt.x;
 				let dy = ptI1.pt.y - ptI.pt.y;
 				let th = Math.atan2(dy, dx);
@@ -603,14 +603,14 @@ class Spline {
 					let ptJ = this.pt(j, start);
 					innerPts.push(ptJ.pt);
 					j += 1;
-					if (ptJ.ty === "corner" || ptJ.th !== null) {
+					if (ptJ.ty === "corner" || ptJ.lth !== null) {
 						break;
 					}
 				}
 				//console.log(innerPts);
 				let inner = new TwoParamSpline(this.curve, innerPts);
-				inner.startTh = this.pt(i, start).th;
-				inner.endTh = this.pt(j - 1, start).th;
+				inner.startTh = this.pt(i, start).rth;
+				inner.endTh = this.pt(j - 1, start).lth;
 				let nIter = 10;
 				inner.initialThs();
 				for (let k = 0; k < nIter; k++) {
@@ -713,9 +713,10 @@ class Spline {
 
 /// ControlPoint is a lot like `Knot` but has no UI, is used for spline solving.
 class ControlPoint {
-	constructor(pt, ty, th) {
+	constructor(pt, ty, lth, rth) {
 		this.pt = pt;
 		this.ty = ty;
-		this.th = th;
+		this.lth = lth;
+		this.rth = rth;
 	}
 }
