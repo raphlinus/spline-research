@@ -88,13 +88,10 @@ class SplineEdit {
 			this.initPt = pt;
 		} else if (obj instanceof TanHandle) {
 			this.mode = "tanhandle";
+			this.isRight = obj.isRight;
 			// This suggests maybe we should use selected point, not initPt
 			this.initPt = new Vec2(obj.knot.x, obj.knot.y);
-			let th = Math.atan2(pt.y - this.initPt.y, pt.x - this.initPt.x);
-			if (ev.shiftKey) {
-				th = Math.PI / 2 * Math.round(th * (2 / Math.PI));
-			}
-			obj.knot.setTan(th);
+			this.updateTan(obj.knot, pt, ev);
 			this.setSelection(new Set([obj.knot]));
 		} else {
 			if (this.selection.size == 1
@@ -141,17 +138,14 @@ class SplineEdit {
 			}
 		} else if (this.mode === "tanhandle") {
 			let r = Math.hypot(pt.x - this.initPt.x, pt.y - this.initPt.y);
-			let ty = r < tanR1 ? "corner" : "smooth";
-			let th = null;
-			if (r >= tanR1 && r < tanR3) {
-				th = Math.atan2(pt.y - this.initPt.y, pt.x - this.initPt.x);
-				if (ev.shiftKey) {
-					th = Math.PI / 2 * Math.round(th * (2 / Math.PI));
-				}
-			}
 			for (let knot of this.selection) {
-				knot.setTy(ty);
-				knot.setTan(th);
+				if (r < tanR1) {
+					knot.setTy("corner");
+					knot.setTan(null, false);
+					knot.setTan(null, true);
+				} else {
+					this.updateTan(knot, pt, ev);
+				}
 			}
 		}
 		this.render();
@@ -213,10 +207,28 @@ class SplineEdit {
 		this.render();
 	}
 
+	updateTan(knot, pt, ev) {
+		let dx = pt.x - this.initPt.x;
+		let dy = pt.y - this.initPt.y;
+		if (!this.isRight) {
+			dx = -dx;
+			dy = -dy;
+		}
+		let r = Math.hypot(dx, dy);
+		let th = null;
+		if (r < tanR3) {
+			th = Math.atan2(dy, dx);
+			if (ev.shiftKey) {
+				th = Math.PI / 2 * Math.round(th * (2 / Math.PI));
+			}
+		}
+		knot.setTan(th, this.isRight);
+	}
+
 	renderSpline() {
 		let ctrlPts = [];
 		for (let knot of this.knots) {
-			let pt = new ControlPoint(new Vec2(knot.x, knot.y), knot.ty, knot.th);
+			let pt = new ControlPoint(new Vec2(knot.x, knot.y), knot.ty, knot.lth, knot.rth);
 			ctrlPts.push(pt);
 		}
 		this.spline = new Spline(ctrlPts, this.isClosed);
@@ -250,7 +262,8 @@ class Knot {
 		this.x = x;
 		this.y = y;
 		this.ty = ty;
-		this.th = null;
+		this.lth = null;
+		this.rth = null;
 		this.selected = false;
 		this.lthLine = null;
 		this.rthLine = null;
@@ -290,40 +303,12 @@ class Knot {
 		return inner;			
 	}
 
-	setTan(th) {
-		this.th = th;
-	}
-
-	addSelDecoration() {
-		let lTh = this.th;
-		let rTh = this.th;
-		if (lTh === null && this.computedLTh !== undefined) lTh = this.computedLTh;
-		if (rTh === null && this.computedRTh !== undefined) rTh = this.computedRTh;
-		this.drawTan(lTh, rTh, tanR2);
-		for (let i = 0; i < 2; i++) {
-			let th = i == 0 ? lTh : rTh;
-			if (th !== null) {
-				let circle = this.se.ui.createSvgElement("circle", true);
-				let scale = i == 0 ? -tanR2 : tanR2;
-				circle.setAttribute("cx", scale * Math.cos(th));
-				circle.setAttribute("cy", scale * Math.sin(th));
-				circle.setAttribute("r", 3);
-				circle.setAttribute("class", "tanhandle");
-				if (this.th === null) {
-					circle.classList.add("computed");
-				}
-				this.handleEl.appendChild(circle);
-				let tanHandle = new TanHandle(this, i != 0);
-				// To be more object oriented, receiver might be the knot or tanHandle. Ah well.
-				this.se.ui.attachReceiver(circle, this.se, tanHandle);
-			}
+	setTan(th, isRight) {
+		if (this.ty === "smooth" || !isRight) {
+			this.lth = th;
 		}
-	}
-
-	removeSelDecoration() {
-		// Maybe DRY?
-		for (let child of this.handleEl.querySelectorAll(".tanhandle")) {
-			this.handleEl.removeChild(child);
+		if (this.ty === "smooth" || isRight) {
+			this.rth = th;
 		}
 	}
 
@@ -376,19 +361,21 @@ class Knot {
 		} else if (selected && !this.selected) {
 			this.handleEl.classList.add("selected");
 		}
-		let computed = this.th === null;
+		let lComputed = this.lth === null;
+		let rComputed = this.rth === null;
 		let drawCirc = selected && (mode !== "creating" && mode !== "dragging");
-		let drawTan = !computed || drawCirc;
+		let drawLTan = !lComputed || drawCirc;
+		let drawRTan = !rComputed || drawCirc;
 		let lth = null;
-		if (drawTan && this.th != null) {
-			lth = this.th;
-		} else if (drawTan && this.computedLTh !== undefined) {
+		if (drawLTan && this.lth != null) {
+			lth = this.lth;
+		} else if (drawLTan && this.computedLTh !== undefined) {
 			lth = this.computedLTh;
 		}
 		let rth = null;
-		if (drawTan && this.th != null) {
-			rth = this.th;
-		} else if (drawTan && this.computedRTh !== undefined) {
+		if (drawRTan && this.rth != null) {
+			rth = this.rth;
+		} else if (drawRTan && this.computedRTh !== undefined) {
 			rth = this.computedRTh;
 		}
 		this.rthLine = this.updateSelLine(rth, this.rthLine, tanR2 - 3);
@@ -397,8 +384,8 @@ class Knot {
 			lth = null;
 			rth = null;
 		}
-		this.lthCircle = this.updateSelCircle(lth, this.lthCircle, -tanR2, computed);
-		this.rthCircle = this.updateSelCircle(rth, this.rthCircle, tanR2, computed);
+		this.lthCircle = this.updateSelCircle(lth, this.lthCircle, -tanR2, lComputed);
+		this.rthCircle = this.updateSelCircle(rth, this.rthCircle, tanR2, rComputed);
 		this.selected = selected;
 	}
 
