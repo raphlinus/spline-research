@@ -143,6 +143,139 @@ function fit_euler(th0, th1) {
 	return {k0: k0, k1: k1, chord: chord, chth: chth};
 }
 
+// This is adapted from spiro_seg_to_bpath in spiro.c
+function render_spiro_rec(ks, x0, y0, x1, y1, result, depth) {
+	let bend = Math.abs(ks[0]) + Math.abs(.5 * ks[1]) + Math.abs(.125 * ks[2]) +
+		Math.abs((1./48) * ks[3]);
+
+	let segCh = Math.hypot(x1 - x0, y1 - y0);
+	let segTh = Math.atan2(y1 - y0, x1 - x0);
+	let xy = integ_spiro(ks[0], ks[1], ks[2], ks[3]);
+	let ch = Math.hypot(xy.u, xy.v);
+	let th = Math.atan2(xy.v, xy.u);
+	let scale = segCh / ch;
+	let rot = segTh - th;
+	if (depth > 5 || bend < 1.0) {
+		let thEven = (1/384) * ks[3] + (1/8) * ks[1] + rot;
+		let thOdd = (1/48) * ks[2] + 0.5 * ks[0];
+		let ul = (scale * (1/3)) * Math.cos(thEven - thOdd);
+		let vl = (scale * (1/3)) * Math.sin(thEven - thOdd);
+		let ur = (scale * (1/3)) * Math.cos(thEven + thOdd);
+		let vr = (scale * (1/3)) * Math.sin(thEven + thOdd);
+		result.push(new Vec2(x0 + ul, y0 + vl));
+		result.push(new Vec2(x1 - ur, y1 - vr));
+	} else {
+		// Recursively subdivide
+		let ksub = [
+			.5 * ks[0] - .125 * ks[1] + (1./64) * ks[2] - (1./768) * ks[3],
+			.25 * ks[1] - (1./16) * ks[2] + (1./128) * ks[3],
+			.125 * ks[2] - (1./32) * ks[3],
+			(1./16) * ks[3]
+		];
+		let thsub = rot - .25 * ks[0] + (1./32) * ks[1] - (1./384) * ks[2] + (1./6144) * ks[3];
+		let cth = 0.5 * scale * Math.cos(thsub);
+		let sth = 0.5 * scale * Math.sin(thsub);
+		let xysub = integ_spiro(ksub[0], ksub[1], ksub[2], ksub[3]);
+		let xmid = x0 + cth * xysub.u - sth * xysub.v;
+		let ymid = y0 + cth * xysub.v + sth * xysub.u;
+		render_spiro_rec(ksub, x0, y0, xmid, ymid, result, depth + 1);
+		result.push(new Vec2(xmid, ymid));
+		ksub[0] += 0.25 * ks[1] + (1/384) * ks[3];
+		ksub[1] += 0.125 * ks[2];
+		ksub[2] += (1/16) * ks[3];
+		render_spiro_rec(ksub, xmid, ymid, x1, y1, result, depth + 1);
+	}
+}
+
+
+// Adapted from https://stackoverflow.com/questions/1148309/inverting-a-4x4-matrix
+function inv4x4(m) {
+	let A2323 = m[10] * m[15] - m[11] * m[14];
+	let A1323 = m[ 9] * m[15] - m[11] * m[13];
+	let A1223 = m[ 9] * m[14] - m[10] * m[13];
+	let A0323 = m[ 8] * m[15] - m[11] * m[12];
+	let A0223 = m[ 8] * m[14] - m[10] * m[12];
+	let A0123 = m[ 8] * m[13] - m[ 9] * m[12];
+	let A2313 = m[ 6] * m[15] - m[ 7] * m[14];
+	let A1313 = m[ 5] * m[15] - m[ 7] * m[13];
+	let A1213 = m[ 5] * m[14] - m[ 6] * m[13];
+	let A2312 = m[ 6] * m[11] - m[ 7] * m[10];
+	let A1312 = m[ 5] * m[11] - m[ 7] * m[ 9];
+	let A1212 = m[ 5] * m[10] - m[ 6] * m[ 9];
+	let A0313 = m[ 4] * m[15] - m[ 7] * m[12];
+	let A0213 = m[ 4] * m[14] - m[ 6] * m[12];
+	let A0312 = m[ 4] * m[11] - m[ 7] * m[ 8];
+	let A0212 = m[ 4] * m[10] - m[ 6] * m[ 8];
+	let A0113 = m[ 4] * m[13] - m[ 5] * m[12];
+	let A0112 = m[ 4] * m[ 9] - m[ 5] * m[ 8];
+
+	let det = m[ 0] * ( m[ 5] * A2323 - m[ 6] * A1323 + m[ 7] * A1223 ) 
+    	- m[ 1] * ( m[ 4] * A2323 - m[ 6] * A0323 + m[ 7] * A0223 ) 
+    	+ m[ 2] * ( m[ 4] * A1323 - m[ 5] * A0323 + m[ 7] * A0123 ) 
+    	- m[ 3] * ( m[ 4] * A1223 - m[ 5] * A0223 + m[ 6] * A0123 );
+	det = 1 / det;
+
+	let r = new Float64Array(16);
+	r[ 0] = det *   ( m[ 5] * A2323 - m[ 6] * A1323 + m[ 7] * A1223 );
+	r[ 1] = det * - ( m[ 1] * A2323 - m[ 2] * A1323 + m[ 3] * A1223 );
+	r[ 2] = det *   ( m[ 1] * A2313 - m[ 2] * A1313 + m[ 3] * A1213 );
+	r[ 3] = det * - ( m[ 1] * A2312 - m[ 2] * A1312 + m[ 3] * A1212 );
+	r[ 4] = det * - ( m[ 4] * A2323 - m[ 6] * A0323 + m[ 7] * A0223 );
+	r[ 5] = det *   ( m[ 0] * A2323 - m[ 2] * A0323 + m[ 3] * A0223 );
+	r[ 6] = det * - ( m[ 0] * A2313 - m[ 2] * A0313 + m[ 3] * A0213 );
+	r[ 7] = det *   ( m[ 0] * A2312 - m[ 2] * A0312 + m[ 3] * A0212 );
+	r[ 8] = det *   ( m[ 4] * A1323 - m[ 5] * A0323 + m[ 7] * A0123 );
+	r[ 9] = det * - ( m[ 0] * A1323 - m[ 1] * A0323 + m[ 3] * A0123 );
+	r[10] = det *   ( m[ 0] * A1313 - m[ 1] * A0313 + m[ 3] * A0113 );
+	r[11] = det * - ( m[ 0] * A1312 - m[ 1] * A0312 + m[ 3] * A0112 );
+	r[12] = det * - ( m[ 4] * A1223 - m[ 5] * A0223 + m[ 6] * A0123 );
+	r[13] = det *   ( m[ 0] * A1223 - m[ 1] * A0223 + m[ 2] * A0123 );
+	r[14] = det * - ( m[ 0] * A1213 - m[ 1] * A0213 + m[ 2] * A0113 );
+	r[15] = det *   ( m[ 0] * A1212 - m[ 1] * A0212 + m[ 2] * A0112 );
+	return r;
+};
+
+function compute_spiro_ends(ks) {
+	let result = new Float64Array(4);
+	let xy = integ_spiro(ks[0], ks[1], ks[2], ks[3]);
+	let ch = Math.hypot(xy.u, xy.v);
+	let th = Math.atan2(xy.v, xy.u);
+	let thEven = 0.5 * ks[0] + (1/48) * ks[2];
+	let thOdd = 0.124 * ks[1] + (1/384) * ks[3] - th;
+	result[0] = thEven - thOdd;
+	result[1] = thEven + thOdd;
+	let kEven = ch * (ks[0] + 0.125 * ks[2]);
+	let kOdd = ch * (0.5 * ks[1] + (1/48) * ks[3]);
+	result[2] = kEven - kOdd;
+	result[3] = kEven + kOdd;
+	return result;
+}
+
+// Should be inverse of compute_spiro_ends
+function solve_spiro_ends(ends) {
+	let ks = new Float64Array(4);
+	let m = new Float64Array(16);
+	let delta = 1e-6;
+	let nIter = 3;
+	for (let iter = 0; iter < nIter; iter++) {
+		let ends0 = compute_spiro_ends(ks);
+		// TODO: compute error norm and bail on success
+		for (let i = 0; i < 4; i++) {
+			let ks1 = new Float64Array(ks);
+			ks1[i] += delta;
+			let ends1 = compute_spiro_ends(ks1);
+			for (let j = 0; j < 4; j++) {
+				m[i * 4 + j] = (ends1[j] - ends0[j]) * (1/delta);
+			}
+		}
+		let inv = inv4x4(m);
+		for (let i = 0; i < 16; i++) {
+			ks[i & 3] += (ends[i >> 2] - ends0[i >> 2]) * inv[i];
+		}
+	}
+	return ks;
+}
+
 class EulerSegment {
 	constructor(th0, th1) {
 		this.params = fit_euler(th0, th1);
@@ -214,29 +347,27 @@ class SpiroCurve extends TwoParamCurve {
 	render(th0, th1) {
 		let seg = new EulerSegment(th0, th1);
 		let result = [];
-		let n = 5;
-		let d = 1. / (n * 3 * seg.params.chord);
-		for (let i = 0; i < n; i++) {
-			let t = i / n;
-			let xy0 = seg.xy(t);
-			let xy1 = seg.xy(t + 1/n);
-			let th0 = seg.th(t);
-			let th1 = seg.th(t + 1/n);
-			let x1 = xy0.x + d * Math.cos(th0);
-			let y1 = xy0.y - d * Math.sin(th0);
-			let x2 = xy1.x - d * Math.cos(th1);
-			let y2 = xy1.y + d * Math.sin(th1);
-			if (i != 0) {
-				result.push(new Vec2(xy0.x, xy0.y));
-			}
-			result.push(new Vec2(x1, y1));
-			result.push(new Vec2(x2, y2));
-		}
+		let ks = [-seg.params.k0, -seg.params.k1, 0, 0];
+		render_spiro_rec(ks, 0, 0, 1, 0, result, 0);
 		return result;
 	}
 
 	render4(th0, th1, k0, k1) {
-		return this.render(th0, th1);
+		if (k0 === null || k1 === null) {
+			let seg = new EulerSegment(th0, th1);
+			let kEndpoints = seg.kEndpoints();
+			if (k0 === null) {
+				k0 = kEndpoints.k0;
+			}
+			if (k1 === null) {
+				k1 = kEndpoints.k1;
+			}
+		}
+		let ends = new Float64Array([-th0, -th1, -k0, -k1]);
+		let ks = solve_spiro_ends(ends);
+		let result = [];
+		render_spiro_rec(ks, 0, 0, 1, 0, result, 0);
+		return result;
 	}
 }
 
