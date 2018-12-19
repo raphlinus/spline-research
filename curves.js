@@ -558,7 +558,7 @@ class Spline {
 	constructor(ctrlPts, isClosed) {
 		this.ctrlPts = ctrlPts;
 		this.isClosed = isClosed;
-		this.curve = new MyCurve();
+		this.curve = new SpiroCurve();
 	}
 
 	pt(i, start) {
