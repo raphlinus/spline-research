@@ -57,16 +57,48 @@ class SplineEdit {
 		this.bezpath = new BezPath;
 		this.selection = new Set();
 		this.mode = "start";
+		this.grid = 20;
+		this.shiftOnDrag = false;
+	}
+
+	renderGrid() {
+		let grid = document.getElementById("grid");
+		let w = 640;
+		let h = 480;
+		for (let i = 0; i < w; i += this.grid) {
+			let line = this.ui.createSvgElement("line");
+			line.setAttribute("x1", i);
+			line.setAttribute("y1", 0);
+			line.setAttribute("x2", i);
+			line.setAttribute("y2", h);
+			grid.appendChild(line);
+		}
+		for (let i = 0; i < h; i += this.grid) {
+			let line = this.ui.createSvgElement("line");
+			line.setAttribute("x1", 0);
+			line.setAttribute("y1", i);
+			line.setAttribute("x2", w);
+			line.setAttribute("y2", i);
+			grid.appendChild(line);
+		}
 	}
 
 	setSelection(sel) {
 		this.selection = sel;
 	}
 
+	roundToGrid(pt) {
+		let g = this.grid;
+		return new Vec2(g * Math.round(pt.x / g), g * Math.round(pt.y / g));
+	}
+
 	onPointerDown(ev, obj) {
 		let pt = this.ui.getCoords(ev);
 		if (obj === null) {
 			let subdivideDist = 5;
+			if (ev.shiftKey) {
+				pt = this.roundToGrid(pt);
+			}
 			let ty = ev.altKey ? "smooth" : "corner";
 			let hit = this.bezpath.hitTest(pt.x, pt.y);
 			let insIx = this.knots.length;
@@ -111,6 +143,7 @@ class SplineEdit {
 				obj.setTan(null);
 			}
 			let sel = new Set([obj]);
+			this.shiftOnDrag = ev.shiftKey;
 			if (this.mode === "dragging" && (ev.shiftKey || this.selection.has(obj))) {
 				for (let a of this.selection) {
 					sel.add(a);
@@ -128,7 +161,12 @@ class SplineEdit {
 		let dy = pt.y - this.lastPt.y;
 		if (this.mode === "dragging") {
 			for (let knot of this.selection) {
-				knot.updatePos(knot.x + dx, knot.y + dy);
+				if (ev.shiftKey && !this.shiftOnDrag && this.selection.size == 1) {
+					pt = this.roundToGrid(pt);
+					knot.updatePos(pt.x, pt.y);
+				} else {
+					knot.updatePos(knot.x + dx, knot.y + dy);
+				}
 			}
 		} else if (this.mode === "creating") {
 			let r = Math.hypot(pt.x - this.initPt.x, pt.y - this.initPt.y);
@@ -418,6 +456,7 @@ class Ui {
 		this.setupHandlers();
 		this.controlPts = [];
 		this.se = new SplineEdit(this);
+		this.se.renderGrid();
 		this.gestureDet = new GestureDet(this);
 	}
 

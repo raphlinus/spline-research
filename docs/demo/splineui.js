@@ -57,6 +57,21 @@ class SplineEdit {
 		this.bezpath = new BezPath;
 		this.selection = new Set();
 		this.mode = "start";
+		this.grid = 10;
+	}
+
+	renderGrid() {
+		let grid = document.getElementById("grid");
+		let w = 640;
+		let h = 480;
+		for (let i = 0; i < w; i += grid) {
+			let line = this.ui.createSvgElement("line");
+			line.setAttribute("x1", i);
+			line.setAttribute("y1", 0);
+			line.setAttribute("x2", i);
+			line.setAttribute("y2", h);
+			grid.appendChild(line);
+		}
 	}
 
 	setSelection(sel) {
@@ -418,6 +433,7 @@ class Ui {
 		this.setupHandlers();
 		this.controlPts = [];
 		this.se = new SplineEdit(this);
+		this.se.renderGrid();
 		this.gestureDet = new GestureDet(this);
 	}
 
