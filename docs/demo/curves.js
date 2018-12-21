@@ -572,7 +572,7 @@ class Spline {
 		}
 		for (let i = 0; i < this.ctrlPts.length; i++) {
 			let pt = this.ctrlPts[i];
-			if (pt.ty === "corner" || pt.th !== null) {
+			if (pt.ty === "corner" || pt.lth !== null) {
 				return i;
 			}
 		}
