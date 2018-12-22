@@ -291,11 +291,9 @@ class MyCurve extends TwoParamCurve {
 	}
 
 	/// Render as a 4-parameter curve with optional adjusted endpoint curvatures.
-	render4(th0, th1, k0, k1) {
-		if (k0 === null && k1 === null) {
-			return this.render(th0, th1);
-		}
-		let cb = new CubicBez(myCubic(th0, th1));
+	render4Quintic(th0, th1, k0, k1) {
+		//let cb = new CubicBez(myCubic(th0, th1));
+		let cb = this.convCubic(this.render4Cubic(th0, th1, k0, k1));
 		// compute second deriv tweak to match curvature
 		function curvAdjust(t, th, k) {
 			if (k === null) return new Vec2(0, 0);
@@ -342,6 +340,54 @@ class MyCurve extends TwoParamCurve {
 			result.push(new Vec2(c[4] + x2, c[5] + y2));
 		}
 		return result;
+	}
+
+	convCubic(pts) {
+		let coords = new Float64Array(8);
+		coords[2] = pts[0].x;
+		coords[3] = pts[0].y;
+		coords[4] = pts[1].x;
+		coords[5] = pts[1].y;
+		coords[6] = 1;
+		return new CubicBez(coords);
+	}
+
+	// Ultimately we want to exactly match the endpoint curvatures (probably breaking
+	// into two cubic segments), but for now, just approximate...
+	render4Cubic(th0, th1, k0, k1) {
+		let cb = new CubicBez(myCubic(th0, th1));
+		let result = [];
+		function deriv_scale(t, th, k) {
+			if (k === null) return 1/3;
+			let c = Math.cos(th);
+			let s = Math.sin(th);
+			let d = cb.deriv(t);
+			let d2 = cb.deriv2(t);
+			let d2cross = d2.y * c - d2.x * s;
+			let ddot = d.x * c + d.y * s;
+			let oldK = d2cross / (ddot * ddot);
+			// fudge to avoid divide-by-zero
+			if (Math.abs(oldK) < 1e-6) oldK = 1e-6;
+			let ratio = k / oldK;
+			// TODO: fine tune this dodgy formula
+			//let scale = ratio < 1 ? 1/2 - ratio/6 : 1/(3*ratio);
+			let scale = 1/(2 + ratio);
+			return scale;
+		}
+		let scale0 = deriv_scale(0, th0, k0);
+		let d0 = cb.deriv(0);
+		result.push(new Vec2(d0.x * scale0, d0.y * scale0));
+		let d1 = cb.deriv(1);
+		let scale1 = deriv_scale(1, -th1, k1);
+		result.push(new Vec2(1 - d1.x * scale1, - d1.y * scale1));
+		return result;
+	}
+
+	render4(th0, th1, k0, k1) {
+		if (k0 === null && k1 === null) {
+			return this.render(th0, th1);
+		}
+		return this.render4Quintic(th0, th1, k0, k1);
 	}
 
 	computeCurvature(th0, th1) {
@@ -640,23 +686,32 @@ class Spline {
 	// Determine whether a control point requires curvature blending, and if so,
 	// the blended curvature. To be invoked after solving.
 	computeCurvatureBlending() {
+		function myTan(th) {
+			if (th > Math.PI / 2) {
+				return Math.tan(Math.PI - th);
+			} else if (th < -Math.PI / 2) {
+				return Math.tan(-Math.PI - th);
+			} else {
+				return Math.tan(th);
+			}
+		}
 		for (let pt of this.ctrlPts) {
 			pt.kBlend = null;
 		}
 		let length = this.ctrlPts.length - (this.isClosed ? 0 : 1);
 		for (let i = 0; i < length; i++) {
 			let pt = this.pt(i, 0);
-			if (pt.ty === "smooth" && pt.th !== null) {
+			if (pt.ty === "smooth" && pt.lth !== null) {
 				let thresh = Math.PI / 2 - 1e-6;
-				if (Math.abs(pt.rAk) > thresh || Math.abs(pt.lAk) > thresh) {
-					// Don't blend reversals. We might reconsider this, but punt for now.
-					continue;
-				}
+				//if (Math.abs(pt.rAk) > thresh || Math.abs(pt.lAk) > thresh) {
+				//	// Don't blend reversals. We might reconsider this, but punt for now.
+				//	continue;
+				//}
 				if (Math.sign(pt.rAk) != Math.sign(pt.lAk)) {
 					pt.kBlend = 0;
 				} else {
-					let rK = Math.tan(pt.rAk) / this.chordLen(i - 1);
-					let lK = Math.tan(pt.lAk) / this.chordLen(i);
+					let rK = myTan(pt.rAk) / this.chordLen(i - 1);
+					let lK = myTan(pt.lAk) / this.chordLen(i);
 					pt.kBlend = 2 / (1 / rK + 1 / lK);
 					//console.log(`point ${i}: kBlend = ${pt.kBlend}`);
 				}

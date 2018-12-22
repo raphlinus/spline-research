@@ -30,23 +30,27 @@ svg:hover .selected .handle {
 	stroke-width: 10;
 }
 svg:hover #handles line.tan {
-	stroke: black;
+	stroke: #00f;
 	stroke-width: 1;
 }
 svg:hover #handles .tanhandle {
 	fill: white;
-	stroke: black;
+	stroke: #00f;
 }
 svg:hover #handles .tanhandle.computed {
 	fill: rgba(255, 255, 255, 0.3);
-	stroke: rgba(0, 0, 0, 0.3);
+	stroke: rgba(0, 0, 255, 0.3);
 }
 svg:hover #handles .tanhandle:hover {
 	fill: #fcb;
 }
+#grid line {
+	stroke: #ddf;
+}
 </style>
 <body>
 	<svg id="s" width="640" height="480" pointer-events="all">
+		<g id="grid" />
 		<path id="ctrlpoly" d="" stroke="none" fill="none" />
 		<path id="spline" d="" stroke="black" fill="none" stroke-width="2" />
 		<path id="spline2" d="" stroke="blue" fill="none" stroke-width="2" />
