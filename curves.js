@@ -292,7 +292,8 @@ class MyCurve extends TwoParamCurve {
 
 	/// Render as a 4-parameter curve with optional adjusted endpoint curvatures.
 	render4Quintic(th0, th1, k0, k1) {
-		let cb = new CubicBez(myCubic(th0, th1));
+		//let cb = new CubicBez(myCubic(th0, th1));
+		let cb = this.convCubic(this.render4Cubic(th0, th1, k0, k1));
 		// compute second deriv tweak to match curvature
 		function curvAdjust(t, th, k) {
 			if (k === null) return new Vec2(0, 0);
@@ -341,6 +342,16 @@ class MyCurve extends TwoParamCurve {
 		return result;
 	}
 
+	convCubic(pts) {
+		let coords = new Float64Array(8);
+		coords[2] = pts[0].x;
+		coords[3] = pts[0].y;
+		coords[4] = pts[1].x;
+		coords[5] = pts[1].y;
+		coords[6] = 1;
+		return new CubicBez(coords);
+	}
+
 	// Ultimately we want to exactly match the endpoint curvatures (probably breaking
 	// into two cubic segments), but for now, just approximate...
 	render4Cubic(th0, th1, k0, k1) {
@@ -376,7 +387,7 @@ class MyCurve extends TwoParamCurve {
 		if (k0 === null && k1 === null) {
 			return this.render(th0, th1);
 		}
-		return this.render4Cubic(th0, th1, k0, k1);
+		return this.render4Quintic(th0, th1, k0, k1);
 	}
 
 	computeCurvature(th0, th1) {
@@ -675,6 +686,15 @@ class Spline {
 	// Determine whether a control point requires curvature blending, and if so,
 	// the blended curvature. To be invoked after solving.
 	computeCurvatureBlending() {
+		function myTan(th) {
+			if (th > Math.PI / 2) {
+				return Math.tan(Math.PI - th);
+			} else if (th < -Math.PI / 2) {
+				return Math.tan(-Math.PI - th);
+			} else {
+				return Math.tan(th);
+			}
+		}
 		for (let pt of this.ctrlPts) {
 			pt.kBlend = null;
 		}
@@ -683,15 +703,15 @@ class Spline {
 			let pt = this.pt(i, 0);
 			if (pt.ty === "smooth" && pt.lth !== null) {
 				let thresh = Math.PI / 2 - 1e-6;
-				if (Math.abs(pt.rAk) > thresh || Math.abs(pt.lAk) > thresh) {
-					// Don't blend reversals. We might reconsider this, but punt for now.
-					continue;
-				}
+				//if (Math.abs(pt.rAk) > thresh || Math.abs(pt.lAk) > thresh) {
+				//	// Don't blend reversals. We might reconsider this, but punt for now.
+				//	continue;
+				//}
 				if (Math.sign(pt.rAk) != Math.sign(pt.lAk)) {
 					pt.kBlend = 0;
 				} else {
-					let rK = Math.tan(pt.rAk) / this.chordLen(i - 1);
-					let lK = Math.tan(pt.lAk) / this.chordLen(i);
+					let rK = myTan(pt.rAk) / this.chordLen(i - 1);
+					let lK = myTan(pt.lAk) / this.chordLen(i);
 					pt.kBlend = 2 / (1 / rK + 1 / lK);
 					//console.log(`point ${i}: kBlend = ${pt.kBlend}`);
 				}
