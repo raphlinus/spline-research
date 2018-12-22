@@ -2,6 +2,10 @@
 <!-- Copyright 2018 Raph Levien -->
 <meta charset="utf-8">
 <style>
+body {
+	margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
 svg {
 	touch-action: none;
 }
@@ -47,8 +51,123 @@ svg:hover #handles .tanhandle:hover {
 #grid line {
 	stroke: #ddf;
 }
+
+#nav {
+    position: relative;
+    font-size: 12px;
+    /* float: left; */
+    height: 25px;
+    z-index: 10;
+    top: 0px;
+    left: 0;
+    padding: 0;
+    margin: 0;
+    width: 100%;
+}
+#nav li {
+    float: left;
+    position: relative;
+    list-style: none;
+}
+#nav li a {
+    display: block;
+    padding: 5px 10px;
+    color: #000;
+    text-decoration: none;
+    cursor: default;
+}
+#nav a:hover:not(.inactive) {
+    background: #cdf;
+}
+#nav li ul {
+    position: absolute;
+    display: none;
+    /*float: none;*/
+}
+#nav li ul a {
+    background: #fff;
+    box-shadow: 2px 2px 5px 0 rgba(0, 0, 0, 0.3);
+    width: 10em;
+    padding: 4px 10px;
+    cursor: default;
+}
+#nav li ul a.inactive {
+	color: #888;
+}
+#nav li:hover ul {
+    display: block;
+    left: 0;
+    margin: 0;
+    padding: 0;
+    border-width: 1px;
+    border-style: solid;
+    border-color: #000;
+}
+#nav.off li ul {
+    display: none;
+}
+
+.modal {
+	display: none;
+	position: fixed;
+	z-index: 1;
+	left: 0;
+	top: 0;
+	width: 100%;
+	height: 100%;
+	overflow: auto;
+	background-color: rgba(255, 255, 255, 0.3);
+}
+
+.modal-content {
+	margin: 15% auto;
+	padding: 20px;
+	border: 1px solid #888;
+	width: 60%;
+	background-color: rgba(255, 255, 255, 0.8);
+}
+
+.close {
+	float: right;
+	font-size: 28px;
+}
+
+.close:hover, .close.focus {
+	cursor: pointer;
+}
+
 </style>
 <body>
+	<ul id="nav">
+		<li><a href="#">File</a>
+			<ul><li><a class="inactive" href="#">Coming soon...</a></li></ul>
+		</li>
+		<li><a href="#">Edit</a>
+			<ul><li><a class="inactive" href="#">Coming soon...</a></li></ul>
+		</li>
+		<li><a href="#">View</a>
+			<ul><li><a class="inactive" href="#">Coming soon...</a></li></ul>
+		</li>
+		<li><a href="#">Help</a>
+			<ul>
+				<li><a id="menu-help">About &amp; help</a></li>
+			</ul>
+		</li>
+	</ul>
+	<div class="modal" id="help-modal">
+		<div class="modal-content">
+			<span class="close" id="help-close">&times;</span>
+			<p><b>A new spline</b></p>
+			<p>Add a new corner point: click. Add a new smooth point, Alt + click, or click and drag.</p>
+			<p>Select multiple points: shift click.</p>
+			<p>Refine a curve: click on the curve and drag.</p>
+			<p>Set an explicit tangent: click and drag on the handles. Set axis-aligned: shift + click. Unset an explicit tangent: drag away.</p>
+			<p>Toggle between smooth and corner points: double-click.</p>
+			<p>Nudge points by 1 px: arrow keys. Nudge by 10 px: shift + arrow keys.
+			<p>Copyright 2018 Raph Levien</p>
+			<p>Github repo: <a href="https://github.com/raphlinus/spline-research">raphlinus/spline-research</a></p>
+		</div>
+	</div>
 	<svg id="s" width="640" height="480" pointer-events="all">
 		<g id="grid" />
 		<path id="ctrlpoly" d="" stroke="none" fill="none" />

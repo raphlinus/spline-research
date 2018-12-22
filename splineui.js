@@ -458,6 +458,7 @@ class Ui {
 		this.se = new SplineEdit(this);
 		this.se.renderGrid();
 		this.gestureDet = new GestureDet(this);
+		this.setupDialogs();
 	}
 
 	setupHandlers() {
@@ -700,6 +701,14 @@ class Ui {
 		handle.setAttribute("cy", y);
 		this.controlPts[ix] = new Vec2(x, y);
 		this.redraw();
+	}
+
+	setupDialogs() {
+		console.log(document.getElementById("menu-help"))
+		document.getElementById("menu-help").addEventListener("click", e =>
+			document.getElementById("help-modal").style.display = "block");
+		document.getElementById("help-close").addEventListener("click", e =>
+			document.getElementById("help-modal").style.display = "none");
 	}
 }
 
