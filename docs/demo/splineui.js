@@ -155,7 +155,11 @@ class SplineEdit {
 					sel.add(obj);
 				}
 			} else {
-				sel = new Set([obj]);
+				if (this.selection.has(obj)) {
+					sel = this.selection;
+				} else {
+					sel = new Set([obj]);
+				}
 			}
 			this.setSelection(sel);
 		}
