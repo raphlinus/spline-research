@@ -298,6 +298,76 @@ class SplineEdit {
 		this.renderSpline();
 		this.renderSel();
 	}
+
+	/// Return a JSON object (suitable for stringify)
+	serialize() {
+		function r(x, adj) {
+			return Math.round(x * adj) / adj;
+		}
+		let pts = [];
+		for (let knot of this.knots) {
+			let pt = {"x": r(knot.x, 100), "y": r(knot.y, 100)};
+			if (knot.ty === "corner") {
+				pt["c"] = 0;
+				if (knot.lth !== null) {
+					pt["l"] = r(knot.lth, 1000);
+				}
+				if (knot.rth !== null) {
+					pt["r"] = r(knot.rth, 1000);
+				}
+			} else {
+				pt["c"] = 1;
+				if (knot.lth !== null) {
+					pt["t"] = r(knot.lth, 1000);
+				}
+			}
+			pts.push(pt);
+		}
+		let sp = {"closed": this.isClosed, "pts": pts};
+		let result = {"subpaths": [sp]};
+		return result;
+	}
+
+
+	/// Take either a JSON object or a string, and set UI state to it
+	deserialize(data) {
+		if (typeof data === 'string') {
+			data = JSON.parse(data);
+		}
+		let sp = data.subpaths[0];
+		let knots = [];
+		for (let pt of sp.pts) {
+			let ty = pt.c ? "smooth" : "corner";
+			let knot = new Knot(this, pt.x, pt.y, ty);
+			if (pt.c) {
+				if ("t" in pt) {
+					knot.lth = pt.t;
+					knot.rth = knot.lth;
+				}
+			} else {
+				if ("l" in pt) {
+					knot.lth = pt.l;
+				}
+				if ("r" in pt) {
+					knot.lth = pt.r;
+				}
+			}
+			knots.push(knot);
+		}
+		// Hopefully for invalid data an exception would have occurred by here.
+
+		for (let knot of this.knots) {
+			knot.handleEl.remove();
+		}
+		this.knots = knots;
+		for (let knot of knots) {
+			this.ui.attachReceiver(knot.handleEl, this, knot);
+		}
+		this.isClosed = sp.closed;
+		console.log(sp.closed);
+		this.selection = new Set();
+		this.render();
+	}
 }
 
 class Knot {
@@ -467,6 +537,7 @@ class Ui {
 		this.showGrid = true;
 		this.se.renderGrid(this.showGrid);
 		this.setupDialogs();
+		this.keyHandlerActive = true;
 	}
 
 	setupHandlers() {
@@ -583,6 +654,8 @@ class Ui {
 	}
 
 	keyDown(e) {
+		// Maybe would be better to use focus instead of explicit logic...
+		if (!this.keyHandlerActive) { return; }
 		let handled = this.se.onKeyDown(e);
 		if (handled) {
 			e.preventDefault();
@@ -734,7 +807,33 @@ class Ui {
 		});
 	}
 
+	saveToJson() {
+		document.getElementById("save-json-modal").style.display = "block";
+		let jsonStr = JSON.stringify(this.se.serialize());
+		let el = document.getElementById("save-json-content");
+		this.removeAllChildren(el);
+		el.appendChild(document.createTextNode(jsonStr));
+	}
+
+	/// This displays the load dialog, doesn't do the load action.
+	loadFromJson() {
+		document.getElementById("load-json-modal").style.display = "block";
+		document.getElementById("load-text").focus();
+		this.keyHandlerActive = false;
+	}
+
+	doLoadAction(data) {
+		// TODO: error handling
+		this.se.deserialize(data);
+		document.getElementById("load-json-modal").style.display = "none";
+		this.keyHandlerActive = true;
+	}
+
 	setupDialogs() {
+		this.addMenuHandler("menu-save", e =>
+			this.saveToJson());
+		this.addMenuHandler("menu-load", e =>
+			this.loadFromJson());
 		this.addMenuHandler("menu-show-grid", e =>
 			this.updateShowGrid(!this.showGrid));
 		this.addMenuHandler("menu-delete", e =>
@@ -744,6 +843,14 @@ class Ui {
 
 		document.getElementById("help-close").addEventListener("click", e =>
 			document.getElementById("help-modal").style.display = "none");
+		document.getElementById("save-json-close").addEventListener("click", e =>
+			document.getElementById("save-json-modal").style.display = "none");
+		document.getElementById("load-json-close").addEventListener("click", e => {
+			document.getElementById("load-json-modal").style.display = "none";
+			this.keyHandlerActive = true;
+		});
+		document.getElementById("load-button").addEventListener("click", e =>
+			this.doLoadAction(document.getElementById("load-text").value));
 	}
 
 	removeAllChildren(el) {

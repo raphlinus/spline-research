@@ -87,7 +87,8 @@ svg:hover #handles .tanhandle:hover {
     /*float: none;*/
 }
 #nav li ul a {
-    /*width: 10em;*/
+    width: 10em;
+    width: -moz-max-content;
     width: max-content;
     padding: 4px 10px;
     cursor: default;
@@ -127,10 +128,20 @@ svg:hover #handles .tanhandle:hover {
 	width: 60%;
 	background-color: rgba(255, 255, 255, 0.8);
 }
+.modal-content pre {
+	white-space: pre-wrap;
+}
+.modal-content textarea {
+	width: 100%;
+}
+.modal-content button {
+	font-size: 14px;
+}
 
 .close {
 	float: right;
 	font-size: 28px;
+	user-select: none;
 }
 
 .close:hover, .close.focus {
@@ -145,7 +156,10 @@ svg:hover #handles .tanhandle:hover {
 <body>
 	<ul id="nav">
 		<li><a href="#">File</a>
-			<ul><li><a class="inactive" href="#">Coming soon...</a></li></ul>
+			<ul>
+				<li><a id="menu-load">Load from JSON</a></li>
+				<li><a id="menu-save">Save to JSON</a></li>
+			</ul>
 		</li>
 		<li><a href="#">Edit</a>
 			<ul>
@@ -177,6 +191,20 @@ svg:hover #handles .tanhandle:hover {
 			<p>Nudge points by 1 px: arrow keys. Nudge by 10 px: Shift + arrow keys.
 			<p>Copyright 2018 Raph Levien</p>
 			<p>Github repo: <a href="https://github.com/raphlinus/spline-research">raphlinus/spline-research</a></p>
+		</div>
+	</div>
+	<div class="modal" id="save-json-modal">
+		<div class="modal-content">
+			<span class="close" id="save-json-close">&times;</span>
+			<pre id="save-json-content"></pre>
+		</div>
+	</div>
+	<div class="modal" id="load-json-modal">
+		<div class="modal-content">
+			<span class="close" id="load-json-close">&times;</span>
+			<p><b>Load from JSON</b></p>
+			<textarea id="load-text" placeholder="Paste JSON data here..." rows=20></textarea>
+			<p><button id="load-button" type="button">Load</button></p>
 		</div>
 	</div>
 	<svg id="s" width="640" height="480" pointer-events="all">
