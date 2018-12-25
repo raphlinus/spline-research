@@ -82,12 +82,13 @@ svg:hover #handles .tanhandle:hover {
 #nav li ul {
     position: absolute;
     display: none;
+    background: #fff;
+    box-shadow: 2px 2px 5px 0 rgba(0, 0, 0, 0.3);
     /*float: none;*/
 }
 #nav li ul a {
-    background: #fff;
-    box-shadow: 2px 2px 5px 0 rgba(0, 0, 0, 0.3);
-    width: 10em;
+    /*width: 10em;*/
+    width: max-content;
     padding: 4px 10px;
     cursor: default;
 }
@@ -103,7 +104,7 @@ svg:hover #handles .tanhandle:hover {
     border-style: solid;
     border-color: #000;
 }
-#nav.off li ul {
+#nav li:hover ul.off {
     display: none;
 }
 
@@ -136,6 +137,10 @@ svg:hover #handles .tanhandle:hover {
 	cursor: pointer;
 }
 
+.invisible {
+	opacity: 0;
+}
+
 </style>
 <body>
 	<ul id="nav">
@@ -143,10 +148,15 @@ svg:hover #handles .tanhandle:hover {
 			<ul><li><a class="inactive" href="#">Coming soon...</a></li></ul>
 		</li>
 		<li><a href="#">Edit</a>
-			<ul><li><a class="inactive" href="#">Coming soon...</a></li></ul>
+			<ul>
+				<li><a id="menu-delete">Delete point</a></li>
+			</ul>
 		</li>
 		<li><a href="#">View</a>
-			<ul><li><a class="inactive" href="#">Coming soon...</a></li></ul>
+			<ul>
+				<li><a id="menu-show-grid" href="#"><span id="show-grid-check">&#x2713;</span>
+					Show grid</a></li>
+			</ul>
 		</li>
 		<li><a href="#">Help</a>
 			<ul>
@@ -159,11 +169,12 @@ svg:hover #handles .tanhandle:hover {
 			<span class="close" id="help-close">&times;</span>
 			<p><b>A new spline</b></p>
 			<p>Add a new corner point: click. Add a new smooth point, Alt + click, or click and drag.</p>
-			<p>Select multiple points: shift click.</p>
+			<p>Select multiple points: Shift + click.</p>
 			<p>Refine a curve: click on the curve and drag.</p>
-			<p>Set an explicit tangent: click and drag on the handles. Set axis-aligned: shift + click. Unset an explicit tangent: drag away.</p>
+			<p>Set an explicit tangent: click and drag on the handles. Set axis-aligned: Shift + click. Unset an explicit tangent: drag away.</p>
 			<p>Toggle between smooth and corner points: double-click.</p>
-			<p>Nudge points by 1 px: arrow keys. Nudge by 10 px: shift + arrow keys.
+			<p>Delete a point: delete (or backspace) key.
+			<p>Nudge points by 1 px: arrow keys. Nudge by 10 px: Shift + arrow keys.
 			<p>Copyright 2018 Raph Levien</p>
 			<p>Github repo: <a href="https://github.com/raphlinus/spline-research">raphlinus/spline-research</a></p>
 		</div>

@@ -61,8 +61,10 @@ class SplineEdit {
 		this.shiftOnDrag = false;
 	}
 
-	renderGrid() {
+	renderGrid(visible) {
 		let grid = document.getElementById("grid");
+		this.ui.removeAllChildren(grid);
+		if (!visible) return;
 		let w = 640;
 		let h = 480;
 		for (let i = 0; i < w; i += this.grid) {
@@ -142,12 +144,18 @@ class SplineEdit {
 				}
 				obj.setTan(null);
 			}
-			let sel = new Set([obj]);
+			let sel;
 			this.shiftOnDrag = ev.shiftKey;
-			if (this.mode === "dragging" && (ev.shiftKey || this.selection.has(obj))) {
-				for (let a of this.selection) {
-					sel.add(a);
+			if (ev.shiftKey) {
+				// toggle point selection
+				sel = new Set(this.selection);
+				if (sel.has(obj)) {
+					sel.delete(obj);
+				} else {
+					sel.add(obj);
 				}
+			} else {
+				sel = new Set([obj]);
 			}
 			this.setSelection(sel);
 		}
@@ -177,13 +185,7 @@ class SplineEdit {
 		} else if (this.mode === "tanhandle") {
 			let r = Math.hypot(pt.x - this.initPt.x, pt.y - this.initPt.y);
 			for (let knot of this.selection) {
-				if (r < tanR1) {
-					knot.setTy("corner");
-					knot.setTan(null, false);
-					knot.setTan(null, true);
-				} else {
-					this.updateTan(knot, pt, ev);
-				}
+				this.updateTan(knot, pt, ev);
 			}
 		}
 		this.render();
@@ -204,19 +206,7 @@ class SplineEdit {
 
 	onKeyDown(ev) {
 		if (ev.key === "Backspace" || ev.key === "Delete") {
-			for (let i = 0; i < this.knots.length; i++) {
-				let knot = this.knots[i];
-				if (this.selection.has(knot)) {
-					this.knots.splice(i, 1);
-					knot.handleEl.remove();
-					i--;
-				}
-			}
-			if (this.knots.length < 3) {
-				this.isClosed = false;
-			}
-			this.selection = new Set();
-			this.render();
+			this.delete();
 			return true;
 		} else if (ev.key === "ArrowLeft") {
 			this.nudge(-1, 0, ev);
@@ -233,6 +223,23 @@ class SplineEdit {
 		}
 		return false;
 	}
+
+	delete() {
+		for (let i = 0; i < this.knots.length; i++) {
+			let knot = this.knots[i];
+			if (this.selection.has(knot)) {
+				this.knots.splice(i, 1);
+				knot.handleEl.remove();
+				i--;
+			}
+		}
+		if (this.knots.length < 3) {
+			this.isClosed = false;
+		}
+		this.selection = new Set();
+		this.render();
+	}
+
 
 	nudge(dx, dy, ev) {
 		if (ev && ev.shiftKey) {
@@ -456,8 +463,9 @@ class Ui {
 		this.setupHandlers();
 		this.controlPts = [];
 		this.se = new SplineEdit(this);
-		this.se.renderGrid();
 		this.gestureDet = new GestureDet(this);
+		this.showGrid = true;
+		this.se.renderGrid(this.showGrid);
 		this.setupDialogs();
 	}
 
@@ -510,6 +518,7 @@ class Ui {
 				svg.setPointerCapture(e.pointerId);
 				this.receiver = receiver;
 				receiver.onPointerDown(e, obj);
+				e.preventDefault();
 				e.stopPropagation();
 			});
 		} else {
@@ -517,6 +526,7 @@ class Ui {
 				this.gestureDet.onPointerDown(e);
 				this.receiver = receiver;
 				receiver.onPointerDown(e, obj);
+				e.preventDefault();
 				e.stopPropagation();
 			});
 			// TODO: add touch handlers
@@ -598,10 +608,7 @@ class Ui {
 	}
 
 	resetPlots() {
-		let plots = document.getElementById("plots");
-		while (plots.firstChild) {
-			plots.removeChild(plots.firstChild);
-		}
+		this.removeAllChildren(document.getElementById("plots"));
 	}
 
 	plotCircle(x, y, r = 2, color = "black", isRaw = false) {
@@ -703,12 +710,46 @@ class Ui {
 		this.redraw();
 	}
 
+	updateShowGrid(showGrid) {
+		if (showGrid) {
+			document.getElementById("show-grid-check").classList.remove("invisible");
+		} else {
+			document.getElementById("show-grid-check").classList.add("invisible");
+		}
+		this.se.renderGrid(showGrid);
+		this.showGrid = showGrid;
+	}
+
+	addMenuHandler(id, handler) {
+		document.getElementById(id).addEventListener("click", e => {
+			handler(e);
+			let el = e.target;
+			while (el.nodeName != "UL") {
+				el = el.parentNode;
+			}
+			// Hacks like this make me think we should just control the menu logic with
+			// JS instead of trying to leverage CSS. Oh well, it works...
+			el.classList.add("off");
+			window.setTimeout(() => el.classList.remove("off"), 50);
+		});
+	}
+
 	setupDialogs() {
-		console.log(document.getElementById("menu-help"))
-		document.getElementById("menu-help").addEventListener("click", e =>
+		this.addMenuHandler("menu-show-grid", e =>
+			this.updateShowGrid(!this.showGrid));
+		this.addMenuHandler("menu-delete", e =>
+			this.se.delete());
+		this.addMenuHandler("menu-help", e =>
 			document.getElementById("help-modal").style.display = "block");
+
 		document.getElementById("help-close").addEventListener("click", e =>
 			document.getElementById("help-modal").style.display = "none");
+	}
+
+	removeAllChildren(el) {
+		while (el.firstChild) {
+			el.removeChild(el.firstChild);
+		}
 	}
 }
 
