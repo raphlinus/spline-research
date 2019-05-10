@@ -30,37 +30,18 @@ Try the [online demo](https://spline.technology/demo).
 
 Read more about the spline in [research paper 1](https://spline.technology/paper1.pdf).
 
-## License and patent grant
+## License
 
-All code in this package is released under the terms of the GNU GPL,
-version 3 or later, at your choice.
+The code in this repository is licensed under the terms of the [Apache-2](LICENSE-APACHE) or
+[MIT](LICENSE-MIT) license, at your choice.
 
-Further, there is a provisional patent application filed for the
-underlying curve technology. The following patent grant applies to any
-patent which may be issued as a result of that application:
-
-Whereas, Raph Levien (hereinafter “Inventor”) has obtained patent
-protection for related technology (hereinafter “Patented Technology”),
-Inventor wishes to aid the the GNU free software project in achieving
-its goals, and Inventor also wishes to increase public awareness of
-Patented Technology, Inventor hereby grants a fully paid up,
-nonexclusive, irrevocable, royalty free license to practice the
-patents listed below (“the Patents”) if and only if practiced in
-conjunction with software distributed under the terms of any version
-of the GNU General Public License as published by the Free Software
-Foundation, 59 Temple Place, Suite 330, Boston, MA 02111. Inventor
-reserves all other rights, including without limitation, licensing for
-software not distributed under the GNU General Public License.
+The ideas in this repository are free for all to implement. Previously there
+were patents and a provisional patent application, but those are hereby passed
+into the public domain.
 
 ## Contributions
 
-This repo is primarily for my individual research. I am open to
-collaboration and will accept contributions, but I also want to
-preserve full ownership of the code so that I can do commercial
-licensing of code derived from it. Thus, contributions to the repo
-will require a signed copyright assignment to me.
-
-Please get in touch if this condition is onerous.
+Contributions are welcome.
 
 — [Raph Levien](https://levien.com)
 
