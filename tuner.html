@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Spline tuner</title>
+</head>
+<body>
+    <h1>Spline tuner</h1>
+
+    <svg id="s" width="800" height="480" pointer-events="all">
+        <rect id="r" x="0" y="0" width="480" height="480" fill="#ccc" />
+        <line x1="500" y1="100" x2="780" y2 = "100" stroke="#000" />
+        <path id="bez" d="" stroke="blue" fill="none" pointer-events="none" />
+        <circle id="ctr" r="2" fill="#080" pointer-events="none" />
+        <path id="curv" d="" stroke="blue" fill="none" pointer-events="none" />
+        <line id="curv-base" x1="500" y1="300" x2="700" y2="300" stroke="black" pointer-events="none" />
+        <g id="plots" />
+    </svg>
+    <div>
+        <button id="loadbutton">Load</button>
+        <button id="savebutton">Save</button>
+    </div>
+    <textarea cols="80" id="json"></textarea>
+</body>
+<script src="curves.js"></script>
+<script src="tuner.js"></script>
+<script src="tunerui.js"></script>
