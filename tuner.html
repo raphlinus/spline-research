@@ -1,14 +1,19 @@
 <!doctype html>
 <html>
 <head>
+    <style>
+        body {
+            font-family: sans-serif;
+        }
+    </style>
     <meta charset="utf-8">
     <title>Spline tuner</title>
 </head>
 <body>
     <h1>Spline tuner</h1>
 
-    <svg id="s" width="800" height="480" pointer-events="all">
-        <rect id="r" x="0" y="0" width="480" height="480" fill="#ccc" />
+    <svg style="position: absolute" id="s" width="800" height="480" pointer-events="all">
+        <!--<rect id="r" x="0" y="0" width="480" height="480" fill="#ccc" />-->
         <line x1="500" y1="100" x2="780" y2 = "100" stroke="#000" />
         <path id="bez" d="" stroke="blue" fill="none" pointer-events="none" />
         <circle id="ctr" r="2" fill="#080" pointer-events="none" />
@@ -17,8 +22,12 @@
         <g id="plots" />
     </svg>
     <div>
+        <canvas id="map" width="480" height="480" />
+    </div>
+    <div>
         <button id="loadbutton">Load</button>
         <button id="savebutton">Save</button>
+        <button id="mapbutton">κ Map</button>
     </div>
     <textarea cols="80" id="json"></textarea>
 </body>

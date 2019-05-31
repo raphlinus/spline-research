@@ -87,6 +87,22 @@ class TwoCubics {
         return [p1, p2, p3, p4, p5];
     }
 
+    // Get curvature at left point
+    atanCurvature(th0, th1) {
+        let coords = new Float64Array(8);
+        let a0 = this.a[0];
+        let p1 = new Vec2(a0 * Math.cos(th0), a0 * Math.sin(th0));
+        let p3 = this.getCenterPt(th0, th1);
+        coords[2] = p1.x;
+        coords[3] = p1.y;
+        coords[4] = this.a[1];
+        coords[5] = this.a[2];
+        coords[6] = p3.x;
+        coords[7] = p3.y;
+        let cb = new CubicBez(coords);
+        return cb.atanCurvature(0);
+    }
+
     // Raise from a single cubic. Takes input either as a CubicBez object
     // or in TwoParamCurve render style (the two interior points).
     static raise(cb) {

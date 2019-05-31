@@ -11,7 +11,7 @@
 class Tuner {
     constructor(ui) {
         // TODO someday: maybe this should be configurable by UI.
-        this.n = 4;
+        this.n = 6;
         // Size of unit square relative to size available;
         this.scale = 0.9;
         this.mapSize = 480;
@@ -191,6 +191,9 @@ class Tuner {
         document.getElementById("savebutton").addEventListener("click", (e) => {
             this.save();
         });
+        document.getElementById("mapbutton").addEventListener("click", (e) => {
+            this.curvatureMap();
+        });
     }
 
     load() {
@@ -206,6 +209,41 @@ class Tuner {
         el.select();
         document.execCommand("copy");
         // TODO: pop up a toast saying "copied to clipboard"
+    }
+
+    curvatureMap() {
+        let ctx = document.getElementById("map").getContext("2d");
+        //ctx.fillStyle = "red";
+        //ctx.fillRect(0, 0, this.mapSize, this.mapSize);
+        let imgData = ctx.createImageData(this.mapSize, this.mapSize);
+        let data = imgData.data;
+        for (let y = 0; y < this.mapSize; y++) {
+            for (let x = 0; x < this.mapSize; x++) {
+                let th0 = (2 / this.mapSize * x - 1) / this.scale * 0.5 * Math.PI;
+                let th1 = (1 - 2 / this.mapSize * y) / this.scale * 0.5 * Math.PI;
+                let ix = ((y * this.mapSize) + x) * 4;
+                let interp = this.curveGrid.get_interp(th0, th1);
+                let atanK = interp.atanCurvature(th0, th1);
+                let k = Math.tan(atanK);
+                let k1 = 0.25 * k;
+                let scaled = Math.asin((Math.sqrt(4 * k1 * k1 + 1) - 1) / (2 * k1));
+                if (atanK > Math.PI / 2) {
+                    scaled = scaled + Math.PI;
+                } else if (atanK < -Math.PI / 2) {
+                    scaled = scaled - Math.PI;
+                }
+                let z = 0.3 * scaled;
+                let r = 128 - 127 * z;
+                let g = 112 + 2 * (r & 8);
+                let b = 128 + 127 * z;
+                g = Math.max(0, Math.min(g, 255));
+                data[ix + 0] = Math.max(0, Math.min(Math.round(r), 255));
+                data[ix + 1] = Math.max(0, Math.min(Math.round(g), 255));
+                data[ix + 2] = Math.max(0, Math.min(Math.round(b), 255));
+                data[ix + 3] = 255;
+            }
+        }
+        ctx.putImageData(imgData, 0, 0);
     }
 }
 
